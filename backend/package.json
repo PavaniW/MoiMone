@@ -1,0 +1,21 @@
+{
+  "name": "finance-tracker-backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Express backend for the personal finance tracker",
+  "main": "index.js",
+  "scripts": {
+    "dev": "node --watch index.js",
+    "start": "node index.js",
+    "test:parser": "node test-parser.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.104.2",
+    "@supabase/supabase-js": "^2.45.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "twilio": "^6.0.2"
+  }
+}

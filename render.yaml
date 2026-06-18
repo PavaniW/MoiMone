@@ -1,0 +1,25 @@
+# Render deployment config for the backend (free web service).
+# Render reads this on "New + → Blueprint" and provisions the service.
+# Secret values (sync: false) are entered in the Render dashboard, not committed.
+services:
+  - type: web
+    name: finance-tracker-backend
+    runtime: node
+    rootDir: backend
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: WEBHOOK_SECRET_TOKEN
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: PARSER_PROVIDER
+        value: groq
+      - key: GROQ_MODEL
+        value: llama-3.3-70b-versatile

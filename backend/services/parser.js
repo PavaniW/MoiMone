@@ -1,0 +1,182 @@
+import Anthropic from '@anthropic-ai/sdk';
+
+// Transaction parser. Accepts raw bank SMS / WhatsApp / email text and returns
+// structured transaction JSON. Three interchangeable providers:
+//
+//   • 'ollama' — free local model (e.g. llama3.2) via the Ollama daemon. Local dev.
+//   • 'groq'   — free hosted LLM API (OpenAI-compatible). Good for deployment.
+//   • 'claude' — Anthropic claude-sonnet-4-6 (needs ANTHROPIC_API_KEY).
+//
+// Selected by PARSER_PROVIDER; if unset, auto-detects in this order:
+// GROQ_API_KEY → groq, ANTHROPIC_API_KEY → claude, else → ollama.
+// Output from every provider is normalized to the same shape.
+
+const CLAUDE_MODEL = 'claude-sonnet-4-6';
+
+// Default currency for amounts that arrive without an explicit code.
+export const DEFAULT_CURRENCY = 'LKR';
+
+// Must stay in sync with the `categories` table seed in supabase/schema.sql.
+export const CATEGORIES = [
+  'Food & Dining',
+  'Transport',
+  'Shopping',
+  'Utilities',
+  'Entertainment',
+  'Health',
+  'Salary',
+  'Other',
+];
+
+const TRANSACTION_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    amount: { type: 'number', description: 'Transaction amount as a positive number' },
+    currency: { type: 'string', description: 'Currency code, e.g. LKR, SAR, USD' },
+    merchant: { type: 'string', description: 'Merchant or payee name; "Unknown" if not stated' },
+    type: { type: 'string', enum: ['expense', 'income'] },
+    category: { type: 'string', enum: CATEGORIES },
+    confidence: { type: 'number', description: 'Confidence in the extraction from 0 to 1' },
+  },
+  required: ['amount', 'currency', 'merchant', 'type', 'category', 'confidence'],
+};
+
+const SYSTEM_PROMPT = `You are a financial transaction parser. Extract structured data from a single bank SMS, WhatsApp message, or email notification.
+
+Rules:
+- amount: the transaction amount as a positive number (no currency symbol, no thousands separators).
+- currency: the currency code if stated (e.g. LKR, SAR, USD); otherwise default to ${DEFAULT_CURRENCY}.
+- merchant: the merchant or payee name. If none is stated, use "Unknown".
+- type: "income" for money received (salary, refund, deposit, credit); "expense" for money spent (purchase, payment, withdrawal, debit, charge).
+- category: choose the single best fit from the allowed list. Use "Salary" only for clear salary/payroll income. Use "Other" when nothing fits.
+- confidence: your confidence in the overall extraction, from 0 to 1.
+
+Return only the structured object — no commentary.`;
+
+// Guarantee a valid, consistent shape regardless of which model produced it.
+function normalize(p) {
+  const amount = Math.abs(Number(p?.amount)) || 0;
+  const type = p?.type === 'income' ? 'income' : 'expense';
+  const category = CATEGORIES.includes(p?.category) ? p.category : 'Other';
+  const merchant = (p?.merchant && String(p.merchant).trim()) || 'Unknown';
+  const currency = (p?.currency && String(p.currency).trim()) || DEFAULT_CURRENCY;
+  let confidence = Number(p?.confidence);
+  if (!(confidence >= 0 && confidence <= 1)) confidence = 0.5;
+  return { amount, currency, merchant, type, category, confidence };
+}
+
+function chooseProvider() {
+  const explicit = (process.env.PARSER_PROVIDER || '').toLowerCase();
+  if (explicit) return explicit;
+  if (process.env.GROQ_API_KEY) return 'groq';
+  if (process.env.ANTHROPIC_API_KEY) return 'claude';
+  return 'ollama';
+}
+
+// --- Claude provider ---
+let anthropic;
+async function parseWithClaude(rawText) {
+  if (!anthropic) anthropic = new Anthropic();
+  const response = await anthropic.messages.create({
+    model: CLAUDE_MODEL,
+    max_tokens: 1024,
+    thinking: { type: 'disabled' },
+    system: SYSTEM_PROMPT,
+    messages: [{ role: 'user', content: rawText }],
+    output_config: { format: { type: 'json_schema', schema: TRANSACTION_SCHEMA } },
+  });
+  if (response.stop_reason === 'refusal') throw new Error('model refused to parse the message');
+  const textBlock = response.content.find((b) => b.type === 'text');
+  if (!textBlock) throw new Error('no text block in model response');
+  return JSON.parse(textBlock.text);
+}
+
+// --- Groq provider (free hosted, OpenAI-compatible) ---
+async function parseWithGroq(rawText) {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) throw new Error('GROQ_API_KEY is not set');
+  const model = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+
+  const jsonInstruction = `Return a JSON object with exactly these keys: amount (number), currency (string), merchant (string), type ("expense" or "income"), category (one of: ${CATEGORIES.join(', ')}), confidence (number 0-1).`;
+
+  let res;
+  try {
+    res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model,
+        temperature: 0,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: `${SYSTEM_PROMPT}\n\n${jsonInstruction}` },
+          { role: 'user', content: rawText },
+        ],
+      }),
+    });
+  } catch {
+    throw new Error('cannot reach Groq API (check network / GROQ_API_KEY)');
+  }
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
+    throw new Error(`Groq request failed (${res.status}): ${detail}`);
+  }
+  const data = await res.json();
+  const content = data?.choices?.[0]?.message?.content;
+  if (!content) throw new Error('Groq returned an empty response');
+  return JSON.parse(content);
+}
+
+// --- Ollama provider (local, free) ---
+async function parseWithOllama(rawText) {
+  const base = process.env.OLLAMA_URL || 'http://localhost:11434';
+  const model = process.env.OLLAMA_MODEL || 'llama3.2';
+
+  let res;
+  try {
+    res = await fetch(`${base}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model,
+        stream: false,
+        format: TRANSACTION_SCHEMA,
+        options: { temperature: 0 },
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: rawText },
+        ],
+      }),
+    });
+  } catch {
+    throw new Error(`cannot reach Ollama at ${base} — is it running? (try: ollama serve)`);
+  }
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
+    if (res.status === 404) throw new Error(`Ollama model "${model}" not found — run: ollama pull ${model}`);
+    throw new Error(`Ollama request failed (${res.status}): ${detail}`);
+  }
+  const data = await res.json();
+  const content = data?.message?.content;
+  if (!content) throw new Error('Ollama returned an empty response');
+  return JSON.parse(content);
+}
+
+/**
+ * Parse a raw message into a structured transaction.
+ * @param {string} rawText
+ * @returns {Promise<{amount:number,currency:string,merchant:string,type:'expense'|'income',category:string,confidence:number}>}
+ */
+export async function parseTransaction(rawText) {
+  if (!rawText || !rawText.trim()) {
+    throw new Error('parseTransaction: rawText is empty');
+  }
+  const provider = chooseProvider();
+  let raw;
+  if (provider === 'ollama') raw = await parseWithOllama(rawText);
+  else if (provider === 'groq') raw = await parseWithGroq(rawText);
+  else if (provider === 'claude') raw = await parseWithClaude(rawText);
+  else throw new Error(`Unknown PARSER_PROVIDER "${provider}" (use "ollama", "groq", or "claude")`);
+  return normalize(raw);
+}

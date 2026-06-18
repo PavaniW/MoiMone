@@ -1,0 +1,111 @@
+import { Router } from 'express';
+import twilio from 'twilio';
+import { parseTransaction, DEFAULT_CURRENCY } from '../services/parser.js';
+import { supabase } from '../lib/supabase.js';
+import { monthRange, currentPeriod } from '../lib/period.js';
+import { verifyWebhookToken } from '../middleware/auth.js';
+
+const router = Router();
+const { MessagingResponse } = twilio.twiml;
+
+// Send a TwiML reply (what Twilio relays back to the WhatsApp user).
+function reply(res, message) {
+  const twiml = new MessagingResponse();
+  twiml.message(message);
+  res.type('text/xml').send(twiml.toString());
+}
+
+// Authenticate inbound requests so the endpoint is never open.
+//   • Twilio configured (TWILIO_AUTH_TOKEN set) → require a valid Twilio
+//     signature. The signed URL must match the public webhook URL, so we
+//     rebuild it from the proxy (ngrok) forwarding headers.
+//   • Otherwise → fall back to the shared WEBHOOK_SECRET_TOKEN (body.token or
+//     Authorization: Bearer), same as /webhook/sms.
+// Set TWILIO_SKIP_VALIDATION=true to force the token path while debugging a tunnel.
+function authenticate(req, res, next) {
+  const twilioToken = process.env.TWILIO_AUTH_TOKEN;
+
+  if (twilioToken && process.env.TWILIO_SKIP_VALIDATION !== 'true') {
+    const proto = req.headers['x-forwarded-proto'] || req.protocol;
+    const host = req.headers['x-forwarded-host'] || req.get('host');
+    const url = `${proto}://${host}${req.originalUrl}`;
+    const valid = twilio.validateRequest(
+      twilioToken,
+      req.headers['x-twilio-signature'],
+      url,
+      req.body || {}
+    );
+    if (!valid) {
+      console.warn(`Twilio signature validation failed for ${url}`);
+      return res.status(403).type('text/xml').send('<Response></Response>');
+    }
+    return next();
+  }
+
+  return verifyWebhookToken(req, res, next);
+}
+
+// "Budget remaining" line for the confirmation, if a budget exists this month.
+async function budgetRemainingLine(category) {
+  const { month, year } = currentPeriod();
+  const { data: budgets } = await supabase
+    .from('budgets')
+    .select('monthly_limit')
+    .eq('category', category)
+    .eq('month', month)
+    .eq('year', year)
+    .limit(1);
+  if (!budgets?.length) return '';
+
+  const limit = Number(budgets[0].monthly_limit);
+  const { start, end } = monthRange(month, year);
+  const { data: txns } = await supabase
+    .from('transactions')
+    .select('amount')
+    .eq('type', 'expense')
+    .eq('category', category)
+    .gte('transaction_date', start)
+    .lt('transaction_date', end);
+  const spent = (txns || []).reduce((sum, t) => sum + Number(t.amount), 0);
+  return ` Budget remaining: ${DEFAULT_CURRENCY} ${(limit - spent).toFixed(2)}.`;
+}
+
+// POST /webhook/whatsapp — Twilio posts inbound WhatsApp messages here
+// (application/x-www-form-urlencoded; key fields: Body, From).
+// Flow: parse the natural-language message with Claude → log the transaction →
+// reply with a confirmation. (Question-answering is the in-app chat, Session 12.)
+router.post('/whatsapp', authenticate, async (req, res) => {
+  const body = (req.body?.Body || '').trim();
+  if (!body) {
+    return reply(res, 'Send me an expense like: "Spent 200 on groceries at Lulu".');
+  }
+
+  try {
+    const parsed = await parseTransaction(body);
+
+    const { error } = await supabase.from('transactions').insert({
+      amount: parsed.amount,
+      type: parsed.type,
+      category: parsed.category,
+      merchant: parsed.merchant,
+      source: 'whatsapp',
+      raw_text: body,
+    });
+    if (error) throw new Error(error.message);
+
+    const merchant =
+      parsed.merchant && parsed.merchant !== 'Unknown' ? ` (${parsed.merchant})` : '';
+    const sign = parsed.type === 'income' ? '+' : '';
+    const remaining = await budgetRemainingLine(parsed.category);
+
+    reply(
+      res,
+      `✅ Logged: ${sign}${parsed.currency} ${parsed.amount} – ${parsed.category}${merchant}.${remaining}`
+    );
+  } catch (err) {
+    console.error('whatsapp webhook error:', err.message);
+    reply(res, `⚠️ Sorry, I couldn't log that. (${err.message})`);
+  }
+});
+
+export default router;
