@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { pathToFileURL } from 'url';
 import express from 'express';
 import cors from 'cors';
 
@@ -54,9 +55,11 @@ app.use((err, _req, res, _next) => {
   res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
 });
 
-// On Vercel the app is invoked per request (serverless) via the default export,
-// so we only start a long-lived listener off-Vercel (local dev / other hosts).
-if (!process.env.VERCEL) {
+// Serverless hosts (Vercel, Netlify) import this module and invoke the exported
+// app per request, so we only start a long-lived listener when the file is run
+// directly (local dev: `node index.js` / `npm run dev`).
+const isDirectRun = import.meta.url === pathToFileURL(process.argv[1] || '').href;
+if (isDirectRun) {
   app.listen(PORT, () => {
     console.log(`🚀 Backend listening on http://localhost:${PORT}`);
   });
