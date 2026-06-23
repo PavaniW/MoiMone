@@ -1054,16 +1054,17 @@ body {
   .app {
     flex-direction: column;
   }
-  /* Sidebar becomes a slim top header showing the brand + sign-out. */
+  /* Sidebar becomes a slim top header showing the brand + account links. */
   .sidebar {
     width: 100%;
     flex-direction: row;
-    align-items: baseline;
-    gap: 0.6rem;
-    padding: 0.85rem 1.1rem;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0.7rem 1.1rem;
   }
   .logo-sub {
-    margin: 0;
+    display: none; /* free space in the mobile header */
   }
   .sidebar-foot {
     margin-top: 0;
