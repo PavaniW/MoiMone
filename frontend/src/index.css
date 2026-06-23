@@ -631,7 +631,28 @@ body {
 
 /* ---------- Editable ledger rows ---------- */
 .ledger-row.edit {
-  grid-template-columns: 64px 1fr 150px 80px 130px 36px;
+  grid-template-columns: 64px 1fr 150px 80px 130px 64px;
+}
+
+.row-actions {
+  display: flex;
+  gap: 0.1rem;
+  justify-self: end;
+}
+
+.row-edit {
+  background: none;
+  border: none;
+  color: var(--faint);
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 0.2rem 0.35rem;
+  border-radius: 4px;
+}
+
+.row-edit:hover {
+  color: var(--green);
+  background: rgba(47, 107, 79, 0.08);
 }
 
 .cat-select {
@@ -651,6 +672,36 @@ body {
   border-color: var(--line);
   background: var(--panel);
   outline: none;
+}
+
+/* ---------- Modal ---------- */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(28, 43, 37, 0.45);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 4rem 1rem;
+  z-index: 50;
+  overflow-y: auto;
+}
+
+.modal {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 1.4rem 1.5rem 1.5rem;
+  width: 100%;
+  max-width: 560px;
+  box-shadow: 0 16px 48px rgba(28, 43, 37, 0.25);
+}
+
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.1rem;
 }
 
 /* ---------- Goals ---------- */
@@ -798,7 +849,7 @@ body {
     grid-template-columns: 52px 1fr 92px;
   }
   .ledger-row.edit {
-    grid-template-columns: 52px 1fr 92px 36px;
+    grid-template-columns: 52px 1fr 92px 60px;
   }
   .ledger-cat,
   .src-tag,

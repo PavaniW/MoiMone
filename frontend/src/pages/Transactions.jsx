@@ -6,13 +6,15 @@ import { api } from '../lib/api.js';
 const FALLBACK_COLOR = '#9A9384';
 const SOURCES = ['sms', 'email', 'whatsapp', 'manual'];
 
-// Page 2 — Transactions: searchable/filterable ledger, inline category edit, delete.
+// Page 2 — Transactions: searchable/filterable ledger, inline category quick-edit,
+// full edit via a modal, and delete.
 export default function Transactions() {
   const [status, setStatus] = useState('loading');
   const [error, setError] = useState(null);
   const [rows, setRows] = useState([]);
   const [categories, setCategories] = useState([]);
   const [showAdd, setShowAdd] = useState(false);
+  const [editing, setEditing] = useState(null); // transaction being edited, or null
 
   const [q, setQ] = useState('');
   const [category, setCategory] = useState('');
@@ -82,6 +84,11 @@ export default function Transactions() {
   function handleCreated(txn) {
     setRows((prev) => [txn, ...prev]);
     setShowAdd(false);
+  }
+
+  function handleUpdated(txn) {
+    setRows((rs) => rs.map((t) => (t.id === txn.id ? txn : t)));
+    setEditing(null);
   }
 
   async function handleCategoryChange(id, newCategory) {
@@ -195,7 +202,7 @@ export default function Transactions() {
               <span className="hide-sm">Category</span>
               <span className="hide-sm">Source</span>
               <span style={{ textAlign: 'right' }}>Amount</span>
-              <span />
+              <span>Edit</span>
             </div>
             {filtered.map((t) => {
               const isIncome = t.type === 'income';
@@ -233,13 +240,14 @@ export default function Transactions() {
                     <span className="sym">{CURRENCY}</span>
                     {formatAmount(Number(t.amount))}
                   </span>
-                  <button
-                    className="row-del"
-                    title="Delete"
-                    onClick={() => handleDelete(t.id)}
-                  >
-                    ✕
-                  </button>
+                  <span className="row-actions">
+                    <button className="row-edit" title="Edit" onClick={() => setEditing(t)}>
+                      ✎
+                    </button>
+                    <button className="row-del" title="Delete" onClick={() => handleDelete(t.id)}>
+                      ✕
+                    </button>
+                  </span>
                 </div>
               );
             })}
@@ -248,6 +256,25 @@ export default function Transactions() {
           <p className="panel-empty">No transactions match these filters.</p>
         )}
       </div>
+
+      {editing && (
+        <div className="modal-overlay" onClick={() => setEditing(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <h3 className="panel-title">Edit transaction</h3>
+              <button className="row-del" title="Close" onClick={() => setEditing(null)}>
+                ✕
+              </button>
+            </div>
+            <AddTransaction
+              categories={categories}
+              initial={editing}
+              onUpdated={handleUpdated}
+              onCancel={() => setEditing(null)}
+            />
+          </div>
+        </div>
+      )}
     </section>
   );
 }

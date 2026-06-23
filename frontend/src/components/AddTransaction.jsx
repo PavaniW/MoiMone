@@ -6,21 +6,39 @@ function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
-const EMPTY = (categories) => ({
-  type: 'expense',
-  amount: '',
-  merchant: '',
-  category: categories[0]?.name || 'Other',
-  transaction_date: today(),
-  description: '',
-  payment_method: '',
-  card_last4: '',
-});
+// Build the form state from an existing transaction (edit) or blank (create).
+function toForm(categories, t) {
+  if (!t) {
+    return {
+      type: 'expense',
+      amount: '',
+      merchant: '',
+      category: categories[0]?.name || 'Other',
+      transaction_date: today(),
+      description: '',
+      payment_method: '',
+      card_last4: '',
+    };
+  }
+  return {
+    type: t.type || 'expense',
+    amount: t.amount != null ? String(t.amount) : '',
+    merchant: t.merchant || '',
+    category: t.category || categories[0]?.name || 'Other',
+    transaction_date: (t.transaction_date || '').slice(0, 10) || today(),
+    description: t.description || '',
+    payment_method: t.payment_method || '',
+    card_last4: t.card_last4 || '',
+  };
+}
 
-// Manual transaction entry form. Posts to /api/transactions and hands the saved
-// row back to the parent via onCreated so the list can update without a refetch.
-export default function AddTransaction({ categories = [], onCreated }) {
-  const [form, setForm] = useState(() => EMPTY(categories));
+// Transaction form. Doubles as create (POST) and edit (PUT):
+//   • create mode (no `initial`): saves a new row, calls onCreated(row)
+//   • edit mode (`initial` set): updates that row, calls onUpdated(row)
+// onCancel, when provided, renders a Cancel button (used by the edit modal).
+export default function AddTransaction({ categories = [], initial = null, onCreated, onUpdated, onCancel }) {
+  const isEdit = Boolean(initial);
+  const [form, setForm] = useState(() => toForm(categories, initial));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
@@ -35,20 +53,27 @@ export default function AddTransaction({ categories = [], onCreated }) {
       return;
     }
 
+    const payload = {
+      type: form.type,
+      amount: Number(form.amount),
+      merchant: form.merchant.trim() || null,
+      category: form.category,
+      transaction_date: form.transaction_date,
+      description: form.description.trim() || null,
+      payment_method: form.payment_method || null,
+      card_last4: form.card_last4.trim() || null,
+    };
+
     setSaving(true);
     try {
-      const created = await api.createTransaction({
-        type: form.type,
-        amount: Number(form.amount),
-        merchant: form.merchant.trim() || null,
-        category: form.category,
-        transaction_date: form.transaction_date,
-        description: form.description.trim() || null,
-        payment_method: form.payment_method || null,
-        card_last4: form.card_last4.trim() || null,
-      });
-      setForm(EMPTY(categories));
-      onCreated?.(created);
+      if (isEdit) {
+        const updated = await api.updateTransaction(initial.id, payload);
+        onUpdated?.(updated);
+      } else {
+        const created = await api.createTransaction(payload);
+        setForm(toForm(categories, null));
+        onCreated?.(created);
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -152,8 +177,13 @@ export default function AddTransaction({ categories = [], onCreated }) {
       {error && <p className="form-error">{error}</p>}
 
       <div className="form-actions">
+        {onCancel && (
+          <button className="btn-secondary" type="button" onClick={onCancel} disabled={saving}>
+            Cancel
+          </button>
+        )}
         <button className="btn-primary" type="submit" disabled={saving}>
-          {saving ? 'Saving…' : 'Add entry'}
+          {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Add entry'}
         </button>
       </div>
     </form>
