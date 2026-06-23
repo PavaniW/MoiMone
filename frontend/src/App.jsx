@@ -5,6 +5,7 @@ import Budgets from './pages/Budgets.jsx';
 import Goals from './pages/Goals.jsx';
 import Chat from './pages/Chat.jsx';
 import Cards from './pages/Cards.jsx';
+import Categories from './pages/Categories.jsx';
 import Settings from './pages/Settings.jsx';
 import SmsSetup from './pages/SmsSetup.jsx';
 import WhatsAppSetup from './pages/WhatsAppSetup.jsx';
@@ -137,6 +138,7 @@ export default function App() {
           <Route path="/goals" element={<Goals />} />
           <Route path="/chat" element={<Chat />} />
           <Route path="/cards" element={<Cards />} />
+          <Route path="/categories" element={<Categories />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/sms-setup" element={<SmsSetup />} />
           <Route path="/whatsapp" element={<WhatsAppSetup />} />

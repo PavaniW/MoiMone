@@ -70,6 +70,11 @@ export const api = {
 
   // Categories
   getCategories: () => request('/api/categories'),
+  createCategory: (data) =>
+    request('/api/categories', { method: 'POST', body: JSON.stringify(data) }),
+  updateCategory: (id, data) =>
+    request(`/api/categories/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteCategory: (id) => request(`/api/categories/${id}`, { method: 'DELETE' }),
 
   // Chat
   chat: (message) => request('/api/chat', { method: 'POST', body: JSON.stringify({ message }) }),

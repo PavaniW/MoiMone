@@ -31,28 +31,32 @@ export const CATEGORIES = [
   'Other',
 ];
 
-const TRANSACTION_SCHEMA = {
-  type: 'object',
-  additionalProperties: false,
-  properties: {
-    amount: { type: 'number', description: 'Transaction amount as a positive number' },
-    currency: { type: 'string', description: 'Currency code, e.g. LKR, SAR, USD' },
-    merchant: { type: 'string', description: 'Merchant or payee name; "Unknown" if not stated' },
-    type: { type: 'string', enum: ['expense', 'income'] },
-    category: { type: 'string', enum: CATEGORIES },
-    payment_method: {
-      type: 'string',
-      enum: ['credit', 'debit', 'cash', 'other'],
-      description: 'Which instrument paid: credit card, debit card, cash, or other',
+// Built per-call so the category enum reflects the user's own (possibly
+// customized) category list rather than only the built-in defaults.
+function buildTransactionSchema(categories) {
+  return {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      amount: { type: 'number', description: 'Transaction amount as a positive number' },
+      currency: { type: 'string', description: 'Currency code, e.g. LKR, SAR, USD' },
+      merchant: { type: 'string', description: 'Merchant or payee name; "Unknown" if not stated' },
+      type: { type: 'string', enum: ['expense', 'income'] },
+      category: { type: 'string', enum: categories },
+      payment_method: {
+        type: 'string',
+        enum: ['credit', 'debit', 'cash', 'other'],
+        description: 'Which instrument paid: credit card, debit card, cash, or other',
+      },
+      card_last4: {
+        type: 'string',
+        description: 'Last 4 digits of the card if stated, otherwise an empty string',
+      },
+      confidence: { type: 'number', description: 'Confidence in the extraction from 0 to 1' },
     },
-    card_last4: {
-      type: 'string',
-      description: 'Last 4 digits of the card if stated, otherwise an empty string',
-    },
-    confidence: { type: 'number', description: 'Confidence in the extraction from 0 to 1' },
-  },
-  required: ['amount', 'currency', 'merchant', 'type', 'category', 'payment_method', 'card_last4', 'confidence'],
-};
+    required: ['amount', 'currency', 'merchant', 'type', 'category', 'payment_method', 'card_last4', 'confidence'],
+  };
+}
 
 const SYSTEM_PROMPT = `You are a financial transaction parser. Extract structured data from a single bank SMS, WhatsApp message, or email notification.
 
@@ -69,10 +73,11 @@ Rules:
 Return only the structured object — no commentary.`;
 
 // Guarantee a valid, consistent shape regardless of which model produced it.
-function normalize(p) {
+// `categories` is the list considered valid; anything else falls back to "Other".
+function normalize(p, categories) {
   const amount = Math.abs(Number(p?.amount)) || 0;
   const type = p?.type === 'income' ? 'income' : 'expense';
-  const category = CATEGORIES.includes(p?.category) ? p.category : 'Other';
+  const category = categories.includes(p?.category) ? p.category : 'Other';
   const merchant = (p?.merchant && String(p.merchant).trim()) || 'Unknown';
   const currency = (p?.currency && String(p.currency).trim()) || DEFAULT_CURRENCY;
   const payment_method = PAYMENT_METHODS.includes(p?.payment_method) ? p.payment_method : 'other';
@@ -93,7 +98,7 @@ function chooseProvider() {
 
 // --- Claude provider ---
 let anthropic;
-async function parseWithClaude(rawText) {
+async function parseWithClaude(rawText, categories) {
   if (!anthropic) anthropic = new Anthropic();
   const response = await anthropic.messages.create({
     model: CLAUDE_MODEL,
@@ -101,7 +106,7 @@ async function parseWithClaude(rawText) {
     thinking: { type: 'disabled' },
     system: SYSTEM_PROMPT,
     messages: [{ role: 'user', content: rawText }],
-    output_config: { format: { type: 'json_schema', schema: TRANSACTION_SCHEMA } },
+    output_config: { format: { type: 'json_schema', schema: buildTransactionSchema(categories) } },
   });
   if (response.stop_reason === 'refusal') throw new Error('model refused to parse the message');
   const textBlock = response.content.find((b) => b.type === 'text');
@@ -110,12 +115,12 @@ async function parseWithClaude(rawText) {
 }
 
 // --- Groq provider (free hosted, OpenAI-compatible) ---
-async function parseWithGroq(rawText) {
+async function parseWithGroq(rawText, categories) {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) throw new Error('GROQ_API_KEY is not set');
   const model = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
 
-  const jsonInstruction = `Return a JSON object with exactly these keys: amount (number), currency (string), merchant (string), type ("expense" or "income"), category (one of: ${CATEGORIES.join(', ')}), payment_method (one of: credit, debit, cash, other), card_last4 (string: the card's last 4 digits, or "" if not stated), confidence (number 0-1).`;
+  const jsonInstruction = `Return a JSON object with exactly these keys: amount (number), currency (string), merchant (string), type ("expense" or "income"), category (one of: ${categories.join(', ')}), payment_method (one of: credit, debit, cash, other), card_last4 (string: the card's last 4 digits, or "" if not stated), confidence (number 0-1).`;
 
   let res;
   try {
@@ -146,7 +151,7 @@ async function parseWithGroq(rawText) {
 }
 
 // --- Ollama provider (local, free) ---
-async function parseWithOllama(rawText) {
+async function parseWithOllama(rawText, categories) {
   const base = process.env.OLLAMA_URL || 'http://localhost:11434';
   const model = process.env.OLLAMA_MODEL || 'llama3.2';
 
@@ -158,7 +163,7 @@ async function parseWithOllama(rawText) {
       body: JSON.stringify({
         model,
         stream: false,
-        format: TRANSACTION_SCHEMA,
+        format: buildTransactionSchema(categories),
         options: { temperature: 0 },
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
@@ -183,17 +188,20 @@ async function parseWithOllama(rawText) {
 /**
  * Parse a raw message into a structured transaction.
  * @param {string} rawText
+ * @param {{categories?: string[]}} [options] - categories restricts the valid
+ *   category set (e.g. a user's own list). Falls back to the built-in defaults.
  * @returns {Promise<{amount:number,currency:string,merchant:string,type:'expense'|'income',category:string,payment_method:'credit'|'debit'|'cash'|'other',card_last4:string|null,confidence:number}>}
  */
-export async function parseTransaction(rawText) {
+export async function parseTransaction(rawText, { categories } = {}) {
   if (!rawText || !rawText.trim()) {
     throw new Error('parseTransaction: rawText is empty');
   }
+  const allowed = Array.isArray(categories) && categories.length ? categories : CATEGORIES;
   const provider = chooseProvider();
   let raw;
-  if (provider === 'ollama') raw = await parseWithOllama(rawText);
-  else if (provider === 'groq') raw = await parseWithGroq(rawText);
-  else if (provider === 'claude') raw = await parseWithClaude(rawText);
+  if (provider === 'ollama') raw = await parseWithOllama(rawText, allowed);
+  else if (provider === 'groq') raw = await parseWithGroq(rawText, allowed);
+  else if (provider === 'claude') raw = await parseWithClaude(rawText, allowed);
   else throw new Error(`Unknown PARSER_PROVIDER "${provider}" (use "ollama", "groq", or "claude")`);
-  return normalize(raw);
+  return normalize(raw, allowed);
 }

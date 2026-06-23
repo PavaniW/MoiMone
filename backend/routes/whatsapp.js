@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import twilio from 'twilio';
 import { parseTransaction, DEFAULT_CURRENCY } from '../services/parser.js';
+import { userCategoryNames } from '../lib/categories.js';
 import { supabase } from '../lib/supabase.js';
 import { monthRange, currentPeriod } from '../lib/period.js';
 import { verifyWebhookToken } from '../middleware/auth.js';
@@ -93,7 +94,8 @@ router.post('/whatsapp', authenticate, async (req, res) => {
       );
     }
 
-    const parsed = await parseTransaction(body);
+    const categories = await userCategoryNames(who.userId);
+    const parsed = await parseTransaction(body, { categories });
     const card = await matchUserCard(who.userId, parsed.card_last4);
 
     const { error } = await supabase.from('transactions').insert({

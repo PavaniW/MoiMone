@@ -16,6 +16,12 @@ const CardIcon = () => (
     <line x1="2" y1="10" x2="22" y2="10" />
   </svg>
 );
+const TagIcon = () => (
+  <svg {...svgProps}>
+    <path d="M20.59 13.41 13.42 20.6a2 2 0 0 1-2.83 0L3 13V3h10l7.59 7.59a2 2 0 0 1 0 2.82z" />
+    <line x1="7" y1="7" x2="7.01" y2="7" />
+  </svg>
+);
 const SmsIcon = () => (
   <svg {...svgProps}>
     <path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 9 9 0 0 1-3.8-.9L3 21l1.3-4A8.4 8.4 0 0 1 3.6 8 8.5 8.5 0 0 1 12 3.5h.5A8.5 8.5 0 0 1 21 11.5z" />
@@ -62,6 +68,11 @@ export default function Settings() {
         <Link to="/cards" className="settings-row">
           <CardIcon />
           <span className="settings-row-label">Cards</span>
+          <Chevron />
+        </Link>
+        <Link to="/categories" className="settings-row">
+          <TagIcon />
+          <span className="settings-row-label">Categories</span>
           <Chevron />
         </Link>
         <Link to="/sms-setup" className="settings-row">

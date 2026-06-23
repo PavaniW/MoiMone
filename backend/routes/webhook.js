@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { parseTransaction } from '../services/parser.js';
 import { supabase } from '../lib/supabase.js';
 import { userByIngestToken, matchUserCard } from '../lib/ingest.js';
+import { userCategoryNames } from '../lib/categories.js';
 
 const router = Router();
 
@@ -23,7 +24,8 @@ router.post('/sms', async (req, res, next) => {
     const who = await userByIngestToken(token);
     if (!who) return res.status(401).json({ error: 'Invalid or missing ingest token' });
 
-    const parsed = await parseTransaction(text);
+    const categories = await userCategoryNames(who.userId);
+    const parsed = await parseTransaction(text, { categories });
 
     // Auto-link to one of the user's registered cards by last 4 digits.
     const card = await matchUserCard(who.userId, parsed.card_last4);
