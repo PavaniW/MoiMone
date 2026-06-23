@@ -241,6 +241,12 @@ body {
   flex-wrap: wrap;
 }
 
+.card-meta {
+  font-size: 0.82rem;
+  color: var(--muted);
+  text-transform: capitalize;
+}
+
 .logo {
   font-size: 1.05rem;
   font-weight: 600;

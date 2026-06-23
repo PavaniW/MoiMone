@@ -16,8 +16,9 @@ const FALLBACK_COLOR = '#9A9384';
 
 // Shape the raw API rows into what the Dashboard components expect.
 // Postgres numerics arrive as strings via supabase-js, so coerce with Number().
-function build(categories, monthTxns, recentTxns, budgetRows) {
+function build(categories, cards, monthTxns, recentTxns, budgetRows) {
   const colorOf = Object.fromEntries(categories.map((c) => [c.name, c.color]));
+  const cardsById = Object.fromEntries(cards.map((c) => [c.id, c]));
 
   let spent = 0;
   let income = 0;
@@ -31,8 +32,20 @@ function build(categories, monthTxns, recentTxns, budgetRows) {
       spent += amount;
       byCategory[t.category] = (byCategory[t.category] || 0) + amount;
 
-      const key = cardKey(t.payment_method, t.card_last4);
-      const label = t.payment_method ? formatCard(t.payment_method, t.card_last4) : 'Unspecified';
+      // Group by registered card when linked, else by raw method/last4.
+      let key;
+      let label;
+      if (t.card_id && cardsById[t.card_id]) {
+        const c = cardsById[t.card_id];
+        key = t.card_id;
+        label = c.last4 ? `${c.nickname} ••${c.last4}` : c.nickname;
+      } else if (t.payment_method) {
+        key = cardKey(t.payment_method, t.card_last4);
+        label = formatCard(t.payment_method, t.card_last4);
+      } else {
+        key = 'unspecified';
+        label = 'Unspecified';
+      }
       if (!byCardMap[key]) byCardMap[key] = { key, label, amount: 0 };
       byCardMap[key].amount += amount;
     }
@@ -69,13 +82,15 @@ export default function Dashboard() {
     (async () => {
       try {
         const period = `?month=${PERIOD.month}&year=${PERIOD.year}`;
-        const [categories, monthTxns, recentTxns, budgetRows] = await Promise.all([
+        const [categories, cards, monthTxns, recentTxns, budgetRows] = await Promise.all([
           api.getCategories(),
+          api.getCards(),
           api.getTransactions(period),
           api.getTransactions('?limit=5'),
           api.getBudgets(period),
         ]);
-        if (active) setState({ status: 'ready', data: build(categories, monthTxns, recentTxns, budgetRows) });
+        if (active)
+          setState({ status: 'ready', data: build(categories, cards, monthTxns, recentTxns, budgetRows) });
       } catch (err) {
         if (active) setState({ status: 'error', message: err.message });
       }

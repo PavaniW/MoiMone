@@ -12,6 +12,25 @@ function cleanLast4(value) {
   return digits.length === 4 ? digits : null;
 }
 
+// Resolve a card_id the user owns into { type, last4 } so the transaction's
+// payment_method/card_last4 stay consistent with the registered card.
+async function resolveCard(req, cardId) {
+  if (!cardId) return null;
+  const { data, error } = await supabase
+    .from('cards')
+    .select('id, type, last4')
+    .eq('id', cardId)
+    .eq('user_id', req.user.id)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) {
+    const e = new Error('card not found');
+    e.status = 400;
+    throw e;
+  }
+  return data;
+}
+
 // Reject a request with a 400 the error handler will surface to the client.
 function badRequest(message) {
   const err = new Error(message);
@@ -57,7 +76,7 @@ router.get('/', async (req, res, next) => {
 // Body: { amount, type, category, merchant?, description?, transaction_date? }.
 router.post('/', async (req, res, next) => {
   try {
-    const { amount, type, category, merchant, description, transaction_date, payment_method, card_last4 } =
+    const { amount, type, category, merchant, description, transaction_date, payment_method, card_last4, card_id } =
       req.body || {};
 
     const value = Math.abs(Number(amount));
@@ -70,14 +89,18 @@ router.post('/', async (req, res, next) => {
       throw badRequest(`payment_method must be one of: ${PAYMENT_METHODS.join(', ')}`);
     }
 
+    // A chosen card sets the method + last4; otherwise use the raw fields (cash/other).
+    const card = await resolveCard(req, card_id);
+
     const row = {
       amount: value,
       type,
       category: String(category).trim(),
       merchant: merchant ? String(merchant).trim() : null,
       description: description ? String(description).trim() : null,
-      payment_method: payment_method || null,
-      card_last4: cleanLast4(card_last4),
+      payment_method: card ? card.type : payment_method || null,
+      card_last4: card ? card.last4 : cleanLast4(card_last4),
+      card_id: card ? card.id : null,
       source: 'manual',
       space_id: targetSpace(req, req.body?.space_id),
       created_by: req.user.id,
@@ -97,7 +120,7 @@ router.post('/', async (req, res, next) => {
 // Only the provided fields are changed.
 router.put('/:id', async (req, res, next) => {
   try {
-    const { amount, type, category, merchant, description, transaction_date, payment_method, card_last4 } =
+    const { amount, type, category, merchant, description, transaction_date, payment_method, card_last4, card_id } =
       req.body || {};
     const updates = {};
 
@@ -130,6 +153,17 @@ router.put('/:id', async (req, res, next) => {
       updates.payment_method = payment_method || null;
     }
     if (card_last4 !== undefined) updates.card_last4 = cleanLast4(card_last4);
+    // A chosen card overrides method/last4; an empty card_id clears the link.
+    if (card_id !== undefined) {
+      if (card_id) {
+        const card = await resolveCard(req, card_id);
+        updates.card_id = card.id;
+        updates.payment_method = card.type;
+        updates.card_last4 = card.last4;
+      } else {
+        updates.card_id = null;
+      }
+    }
     // Moving an entry between spaces (e.g. Personal -> Shared).
     if (req.body?.space_id !== undefined) updates.space_id = targetSpace(req, req.body.space_id);
 

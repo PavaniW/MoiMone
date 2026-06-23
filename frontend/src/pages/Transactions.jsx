@@ -1,10 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
 import AddTransaction from '../components/AddTransaction.jsx';
-import { formatAmount, formatDay, formatCard, cardKey, CURRENCY } from '../lib/format.js';
+import { formatAmount, formatDay, formatCard, CURRENCY } from '../lib/format.js';
 import { api } from '../lib/api.js';
 
 const FALLBACK_COLOR = '#9A9384';
 const SOURCES = ['sms', 'email', 'whatsapp', 'manual'];
+
+// Label for a transaction's payment: a registered card's name, else raw method.
+function cardLabel(t, cardsById) {
+  if (t.card_id && cardsById[t.card_id]) {
+    const c = cardsById[t.card_id];
+    return c.last4 ? `${c.nickname} ••${c.last4}` : c.nickname;
+  }
+  return formatCard(t.payment_method, t.card_last4);
+}
 
 // Page 2 — Transactions: searchable/filterable ledger, inline category quick-edit,
 // full edit via a modal, and delete.
@@ -13,6 +22,7 @@ export default function Transactions() {
   const [error, setError] = useState(null);
   const [rows, setRows] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [cards, setCards] = useState([]);
   const [showAdd, setShowAdd] = useState(false);
   const [editing, setEditing] = useState(null); // transaction being edited, or null
 
@@ -26,10 +36,15 @@ export default function Transactions() {
     let active = true;
     (async () => {
       try {
-        const [txns, cats] = await Promise.all([api.getTransactions(), api.getCategories()]);
+        const [txns, cats, cds] = await Promise.all([
+          api.getTransactions(),
+          api.getCategories(),
+          api.getCards(),
+        ]);
         if (active) {
           setRows(txns);
           setCategories(cats);
+          setCards(cds);
           setStatus('ready');
         }
       } catch (err) {
@@ -48,17 +63,7 @@ export default function Transactions() {
     () => Object.fromEntries(categories.map((c) => [c.name, c.color])),
     [categories]
   );
-
-  // Distinct cards/methods present in the data, for the filter dropdown.
-  const cards = useMemo(() => {
-    const map = new Map();
-    for (const t of rows) {
-      if (!t.payment_method) continue;
-      const key = cardKey(t.payment_method, t.card_last4);
-      if (!map.has(key)) map.set(key, formatCard(t.payment_method, t.card_last4));
-    }
-    return [...map.entries()].sort((a, b) => a[1].localeCompare(b[1]));
-  }, [rows]);
+  const cardsById = useMemo(() => Object.fromEntries(cards.map((c) => [c.id, c])), [cards]);
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -66,7 +71,11 @@ export default function Transactions() {
       if (category && t.category !== category) return false;
       if (source && t.source !== source) return false;
       if (type && t.type !== type) return false;
-      if (card && cardKey(t.payment_method, t.card_last4) !== card) return false;
+      if (card) {
+        if (card === 'cash') {
+          if (t.payment_method !== 'cash') return false;
+        } else if (t.card_id !== card) return false;
+      }
       if (needle) {
         const hay = `${t.merchant || ''} ${t.description || ''} ${t.category}`.toLowerCase();
         if (!hay.includes(needle)) return false;
@@ -76,8 +85,7 @@ export default function Transactions() {
   }, [rows, q, category, source, type, card]);
 
   const total = useMemo(
-    () =>
-      filtered.reduce((sum, t) => sum + (t.type === 'income' ? 1 : -1) * Number(t.amount), 0),
+    () => filtered.reduce((sum, t) => sum + (t.type === 'income' ? 1 : -1) * Number(t.amount), 0),
     [filtered]
   );
 
@@ -97,7 +105,7 @@ export default function Transactions() {
     try {
       await api.updateTransaction(id, { category: newCategory });
     } catch (err) {
-      setRows(prev); // revert on failure
+      setRows(prev);
       setError(err.message);
     }
   }
@@ -138,7 +146,7 @@ export default function Transactions() {
 
       {showAdd && (
         <div className="panel" style={{ marginTop: '1.25rem' }}>
-          <AddTransaction categories={categories} onCreated={handleCreated} />
+          <AddTransaction categories={categories} cards={cards} onCreated={handleCreated} />
         </div>
       )}
 
@@ -174,11 +182,13 @@ export default function Transactions() {
         </select>
         <select className="field-input" value={card} onChange={(e) => setCard(e.target.value)}>
           <option value="">All cards</option>
-          {cards.map(([key, label]) => (
-            <option key={key} value={key}>
-              {label}
+          {cards.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.nickname}
+              {c.last4 ? ` ••${c.last4}` : ''}
             </option>
           ))}
+          <option value="cash">Cash</option>
         </select>
       </div>
 
@@ -206,6 +216,7 @@ export default function Transactions() {
             </div>
             {filtered.map((t) => {
               const isIncome = t.type === 'income';
+              const label = cardLabel(t, cardsById);
               return (
                 <div className="ledger-row edit body" key={t.id}>
                   <span className="ledger-date num">{formatDay(t.transaction_date)}</span>
@@ -216,9 +227,7 @@ export default function Transactions() {
                     />
                     <span className="merchant-text">
                       {t.merchant || '—'}
-                      {t.payment_method && (
-                        <span className="card-tag">{formatCard(t.payment_method, t.card_last4)}</span>
-                      )}
+                      {label && <span className="card-tag">{label}</span>}
                     </span>
                   </span>
                   <span className="hide-sm">
@@ -268,6 +277,7 @@ export default function Transactions() {
             </div>
             <AddTransaction
               categories={categories}
+              cards={cards}
               initial={editing}
               onUpdated={handleUpdated}
               onCancel={() => setEditing(null)}

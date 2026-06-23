@@ -16,8 +16,7 @@ function toForm(categories, t) {
       category: categories[0]?.name || 'Other',
       transaction_date: today(),
       description: '',
-      payment_method: '',
-      card_last4: '',
+      paidWith: '',
     };
   }
   return {
@@ -27,8 +26,12 @@ function toForm(categories, t) {
     category: t.category || categories[0]?.name || 'Other',
     transaction_date: (t.transaction_date || '').slice(0, 10) || today(),
     description: t.description || '',
-    payment_method: t.payment_method || '',
-    card_last4: t.card_last4 || '',
+    // A linked card wins; otherwise cash/other; otherwise none.
+    paidWith: t.card_id
+      ? `card:${t.card_id}`
+      : t.payment_method === 'cash' || t.payment_method === 'other'
+        ? t.payment_method
+        : '',
   };
 }
 
@@ -36,7 +39,7 @@ function toForm(categories, t) {
 //   • create mode (no `initial`): saves a new row, calls onCreated(row)
 //   • edit mode (`initial` set): updates that row, calls onUpdated(row)
 // onCancel, when provided, renders a Cancel button (used by the edit modal).
-export default function AddTransaction({ categories = [], initial = null, onCreated, onUpdated, onCancel }) {
+export default function AddTransaction({ categories = [], cards = [], initial = null, onCreated, onUpdated, onCancel }) {
   const isEdit = Boolean(initial);
   const [form, setForm] = useState(() => toForm(categories, initial));
   const [saving, setSaving] = useState(false);
@@ -60,9 +63,19 @@ export default function AddTransaction({ categories = [], initial = null, onCrea
       category: form.category,
       transaction_date: form.transaction_date,
       description: form.description.trim() || null,
-      payment_method: form.payment_method || null,
-      card_last4: form.card_last4.trim() || null,
     };
+    // Resolve "Paid with": a registered card, or cash/other, or nothing.
+    if (form.paidWith.startsWith('card:')) {
+      payload.card_id = form.paidWith.slice(5);
+    } else if (form.paidWith === 'cash' || form.paidWith === 'other') {
+      payload.payment_method = form.paidWith;
+      payload.card_id = null;
+      payload.card_last4 = null;
+    } else {
+      payload.payment_method = null;
+      payload.card_id = null;
+      payload.card_last4 = null;
+    }
 
     setSaving(true);
     try {
@@ -150,27 +163,17 @@ export default function AddTransaction({ categories = [], initial = null, onCrea
 
         <label className="field">
           <span className="field-label">Paid with</span>
-          <select className="field-input" value={form.payment_method} onChange={set('payment_method')}>
+          <select className="field-input" value={form.paidWith} onChange={set('paidWith')}>
             <option value="">—</option>
-            <option value="credit">Credit card</option>
-            <option value="debit">Debit card</option>
+            {cards.map((c) => (
+              <option key={c.id} value={`card:${c.id}`}>
+                {c.nickname}
+                {c.last4 ? ` ••${c.last4}` : ''}
+              </option>
+            ))}
             <option value="cash">Cash</option>
             <option value="other">Other</option>
           </select>
-        </label>
-
-        <label className="field">
-          <span className="field-label">Card last 4</span>
-          <input
-            className="field-input num"
-            type="text"
-            inputMode="numeric"
-            maxLength={4}
-            value={form.card_last4}
-            onChange={set('card_last4')}
-            placeholder="4521"
-            disabled={form.payment_method !== 'credit' && form.payment_method !== 'debit'}
-          />
         </label>
       </div>
 

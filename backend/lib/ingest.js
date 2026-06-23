@@ -13,6 +13,20 @@ export async function userByIngestToken(token) {
   return data ? { userId: data.id, spaceId: data.personal_space_id } : null;
 }
 
+// Find the user's registered card matching a last-4 (for auto-linking SMS).
+// Returns { id, type } or null.
+export async function matchUserCard(userId, last4) {
+  if (!userId || !last4) return null;
+  const { data } = await supabase
+    .from('cards')
+    .select('id, type')
+    .eq('user_id', userId)
+    .eq('last4', last4)
+    .limit(1)
+    .maybeSingle();
+  return data || null;
+}
+
 // Resolve the user from an inbound WhatsApp sender (e.g. "whatsapp:+9477...").
 export async function userByWhatsApp(from) {
   if (!from) return null;

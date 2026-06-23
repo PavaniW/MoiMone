@@ -60,6 +60,12 @@ export const api = {
     request(`/api/goals/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteGoal: (id) => request(`/api/goals/${id}`, { method: 'DELETE' }),
 
+  // Cards
+  getCards: () => request('/api/cards'),
+  createCard: (data) => request('/api/cards', { method: 'POST', body: JSON.stringify(data) }),
+  updateCard: (id, data) => request(`/api/cards/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteCard: (id) => request(`/api/cards/${id}`, { method: 'DELETE' }),
+
   // Categories
   getCategories: () => request('/api/categories'),
 

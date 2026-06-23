@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { parseTransaction } from '../services/parser.js';
 import { supabase } from '../lib/supabase.js';
-import { userByIngestToken } from '../lib/ingest.js';
+import { userByIngestToken, matchUserCard } from '../lib/ingest.js';
 
 const router = Router();
 
@@ -25,6 +25,9 @@ router.post('/sms', async (req, res, next) => {
 
     const parsed = await parseTransaction(text);
 
+    // Auto-link to one of the user's registered cards by last 4 digits.
+    const card = await matchUserCard(who.userId, parsed.card_last4);
+
     const { data, error } = await supabase
       .from('transactions')
       .insert({
@@ -32,8 +35,9 @@ router.post('/sms', async (req, res, next) => {
         type: parsed.type,
         category: parsed.category,
         merchant: parsed.merchant,
-        payment_method: parsed.payment_method,
+        payment_method: card ? card.type : parsed.payment_method,
         card_last4: parsed.card_last4,
+        card_id: card ? card.id : null,
         source: 'sms',
         raw_text: text,
         created_by: who.userId,

@@ -4,6 +4,7 @@ import Transactions from './pages/Transactions.jsx';
 import Budgets from './pages/Budgets.jsx';
 import Goals from './pages/Goals.jsx';
 import Chat from './pages/Chat.jsx';
+import Cards from './pages/Cards.jsx';
 import Settings from './pages/Settings.jsx';
 import Login from './pages/Login.jsx';
 import { useAuth } from './auth.jsx';
@@ -105,6 +106,12 @@ export default function App() {
         <div className="sidebar-foot">
           <span className="user-email">{user?.email}</span>
           <NavLink
+            to="/cards"
+            className={({ isActive }) => (isActive ? 'foot-link active' : 'foot-link')}
+          >
+            Cards
+          </NavLink>
+          <NavLink
             to="/settings"
             className={({ isActive }) => (isActive ? 'foot-link active' : 'foot-link')}
           >
@@ -123,6 +130,7 @@ export default function App() {
           <Route path="/budgets" element={<Budgets />} />
           <Route path="/goals" element={<Goals />} />
           <Route path="/chat" element={<Chat />} />
+          <Route path="/cards" element={<Cards />} />
           <Route path="/settings" element={<Settings />} />
         </Routes>
       </main>

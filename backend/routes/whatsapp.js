@@ -4,7 +4,7 @@ import { parseTransaction, DEFAULT_CURRENCY } from '../services/parser.js';
 import { supabase } from '../lib/supabase.js';
 import { monthRange, currentPeriod } from '../lib/period.js';
 import { verifyWebhookToken } from '../middleware/auth.js';
-import { userByWhatsApp } from '../lib/ingest.js';
+import { userByWhatsApp, matchUserCard } from '../lib/ingest.js';
 
 const router = Router();
 const { MessagingResponse } = twilio.twiml;
@@ -94,14 +94,16 @@ router.post('/whatsapp', authenticate, async (req, res) => {
     }
 
     const parsed = await parseTransaction(body);
+    const card = await matchUserCard(who.userId, parsed.card_last4);
 
     const { error } = await supabase.from('transactions').insert({
       amount: parsed.amount,
       type: parsed.type,
       category: parsed.category,
       merchant: parsed.merchant,
-      payment_method: parsed.payment_method,
+      payment_method: card ? card.type : parsed.payment_method,
       card_last4: parsed.card_last4,
+      card_id: card ? card.id : null,
       source: 'whatsapp',
       raw_text: body,
       created_by: who.userId,
