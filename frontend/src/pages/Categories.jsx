@@ -6,6 +6,14 @@ import BackLink from '../components/BackLink.jsx';
 const PROTECTED = 'Other'; // parser fallback — can't be renamed/deleted
 const EMPTY = { name: '', icon: '', color: '#2f6b4f' };
 
+// Pencil (edit) icon — matches the app's other line icons.
+const PencilIcon = () => (
+  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 20h9" />
+    <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z" />
+  </svg>
+);
+
 // Categories manager — add/edit/delete your own categories. They power the
 // Add/Edit dropdown, budget colors, and the AI parser for incoming SMS/WhatsApp.
 export default function Categories() {
@@ -210,7 +218,7 @@ export default function Categories() {
               </span>
               <div className="cat-row-actions">
                 <button className="row-edit" title="Edit" onClick={() => startEdit(c)}>
-                  ✎
+                  <PencilIcon />
                 </button>
                 {c.name !== PROTECTED && (
                   <button className="row-del" title="Delete" onClick={() => remove(c)}>

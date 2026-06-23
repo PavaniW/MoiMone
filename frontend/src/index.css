@@ -1296,12 +1296,14 @@ body {
 }
 
 .row-edit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   background: none;
   color: var(--muted);
-  font-size: 0.95rem;
   cursor: pointer;
-  padding: 0.2rem 0.35rem;
+  padding: 0.3rem;
   border-radius: 6px;
 }
 .row-edit:hover {
