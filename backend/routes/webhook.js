@@ -1,20 +1,28 @@
 import { Router } from 'express';
-import { verifyWebhookToken } from '../middleware/auth.js';
 import { parseTransaction } from '../services/parser.js';
 import { supabase } from '../lib/supabase.js';
+import { userByIngestToken } from '../lib/ingest.js';
 
 const router = Router();
 
 // POST /webhook/sms — iOS Shortcut posts raw bank SMS here.
-// Body: { "text": "<sms body>", "token": "<WEBHOOK_SECRET_TOKEN>" }
-// Flow: verify token → parse with Claude → store in transactions.
-router.post('/sms', verifyWebhookToken, async (req, res, next) => {
+// Body: { "text": "<sms body>", "token": "<your personal ingest token>" }
+// The token (from GET /api/me, unique per user) identifies whose account this
+// is, so the transaction lands in that user's private space. A bad/missing
+// token is rejected.
+router.post('/sms', async (req, res, next) => {
   const text = req.body?.text;
+  const header = req.headers.authorization || '';
+  const token = req.body?.token || (header.startsWith('Bearer ') ? header.slice(7) : null);
+
   if (!text || !text.trim()) {
     return res.status(400).json({ error: 'Missing "text" in request body' });
   }
 
   try {
+    const who = await userByIngestToken(token);
+    if (!who) return res.status(401).json({ error: 'Invalid or missing ingest token' });
+
     const parsed = await parseTransaction(text);
 
     const { data, error } = await supabase
@@ -28,6 +36,8 @@ router.post('/sms', verifyWebhookToken, async (req, res, next) => {
         card_last4: parsed.card_last4,
         source: 'sms',
         raw_text: text,
+        created_by: who.userId,
+        space_id: who.spaceId, // always the user's private space (never shared)
       })
       .select()
       .single();

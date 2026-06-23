@@ -4,6 +4,7 @@ import { parseTransaction, DEFAULT_CURRENCY } from '../services/parser.js';
 import { supabase } from '../lib/supabase.js';
 import { monthRange, currentPeriod } from '../lib/period.js';
 import { verifyWebhookToken } from '../middleware/auth.js';
+import { userByWhatsApp } from '../lib/ingest.js';
 
 const router = Router();
 const { MessagingResponse } = twilio.twiml;
@@ -45,12 +46,13 @@ function authenticate(req, res, next) {
   return verifyWebhookToken(req, res, next);
 }
 
-// "Budget remaining" line for the confirmation, if a budget exists this month.
-async function budgetRemainingLine(category) {
+// "Budget remaining" line for the confirmation, scoped to this user's space.
+async function budgetRemainingLine(category, spaceId) {
   const { month, year } = currentPeriod();
   const { data: budgets } = await supabase
     .from('budgets')
     .select('monthly_limit')
+    .eq('space_id', spaceId)
     .eq('category', category)
     .eq('month', month)
     .eq('year', year)
@@ -62,6 +64,7 @@ async function budgetRemainingLine(category) {
   const { data: txns } = await supabase
     .from('transactions')
     .select('amount')
+    .eq('space_id', spaceId)
     .eq('type', 'expense')
     .eq('category', category)
     .gte('transaction_date', start)
@@ -81,6 +84,15 @@ router.post('/whatsapp', authenticate, async (req, res) => {
   }
 
   try {
+    // Identify the user by their registered WhatsApp number.
+    const who = await userByWhatsApp(req.body?.From);
+    if (!who) {
+      return reply(
+        res,
+        "⚠️ This number isn't linked to a MoiMone account yet. Add it under your profile in the app, then try again."
+      );
+    }
+
     const parsed = await parseTransaction(body);
 
     const { error } = await supabase.from('transactions').insert({
@@ -92,13 +104,15 @@ router.post('/whatsapp', authenticate, async (req, res) => {
       card_last4: parsed.card_last4,
       source: 'whatsapp',
       raw_text: body,
+      created_by: who.userId,
+      space_id: who.spaceId, // user's private space
     });
     if (error) throw new Error(error.message);
 
     const merchant =
       parsed.merchant && parsed.merchant !== 'Unknown' ? ` (${parsed.merchant})` : '';
     const sign = parsed.type === 'income' ? '+' : '';
-    const remaining = await budgetRemainingLine(parsed.category);
+    const remaining = await budgetRemainingLine(parsed.category, who.spaceId);
 
     reply(
       res,
