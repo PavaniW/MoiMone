@@ -6,6 +6,7 @@ import Goals from './pages/Goals.jsx';
 import Chat from './pages/Chat.jsx';
 import Cards from './pages/Cards.jsx';
 import Settings from './pages/Settings.jsx';
+import SmsSetup from './pages/SmsSetup.jsx';
 import Login from './pages/Login.jsx';
 import { useAuth } from './auth.jsx';
 import { isSupabaseConfigured } from './lib/supabase.js';
@@ -70,7 +71,7 @@ const nav = [
 ];
 
 export default function App() {
-  const { loading, session, user, signOut } = useAuth();
+  const { loading, session } = useAuth();
 
   if (!isSupabaseConfigured) {
     return (
@@ -104,22 +105,25 @@ export default function App() {
           ))}
         </nav>
         <div className="sidebar-foot">
-          <span className="user-email">{user?.email}</span>
-          <NavLink
-            to="/cards"
-            className={({ isActive }) => (isActive ? 'foot-link active' : 'foot-link')}
-          >
-            Cards
-          </NavLink>
           <NavLink
             to="/settings"
             className={({ isActive }) => (isActive ? 'foot-link active' : 'foot-link')}
           >
-            SMS Setup
+            <svg
+              viewBox="0 0 24 24"
+              width="16"
+              height="16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+            </svg>
+            Settings
           </NavLink>
-          <button className="signout" onClick={signOut}>
-            Sign out
-          </button>
         </div>
       </aside>
 
@@ -132,6 +136,7 @@ export default function App() {
           <Route path="/chat" element={<Chat />} />
           <Route path="/cards" element={<Cards />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/sms-setup" element={<SmsSetup />} />
         </Routes>
       </main>
 

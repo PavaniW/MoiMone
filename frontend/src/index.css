@@ -154,7 +154,7 @@ body {
   margin: 1.25rem 0 0;
 }
 
-/* ---------- Account-area link (SMS Setup) ---------- */
+/* ---------- Account-area link (Settings) ---------- */
 .foot-link {
   font-family: var(--display);
   color: #aebbae;
@@ -163,12 +163,63 @@ body {
   padding: 0.4rem 0.7rem;
   border: 1px solid #2c3b33;
   border-radius: 6px;
-  text-align: left;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
 }
 .foot-link:hover,
 .foot-link.active {
   background: rgba(255, 255, 255, 0.06);
   color: #fff;
+}
+
+/* ---------- Settings hub (icon + label rows) ---------- */
+.settings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-top: 1.25rem;
+  max-width: 520px;
+}
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.95rem 1.1rem;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  text-decoration: none;
+  color: var(--ink);
+  font-family: var(--display);
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+}
+.settings-row:hover {
+  background: #f3f5ef;
+}
+.settings-row svg {
+  width: 20px;
+  height: 20px;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.settings-row-label {
+  flex: 1;
+}
+.settings-row .chev {
+  width: 18px;
+  height: 18px;
+  color: var(--faint);
+}
+.settings-row.danger {
+  color: var(--sienna);
+}
+.settings-row.danger svg {
+  color: var(--sienna);
 }
 
 /* ---------- SMS Setup page ---------- */
