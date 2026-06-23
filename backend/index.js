@@ -3,6 +3,8 @@ import { pathToFileURL } from 'url';
 import express from 'express';
 import cors from 'cors';
 
+import { requireAuth } from './middleware/requireAuth.js';
+import meRouter from './routes/me.js';
 import transactionsRouter from './routes/transactions.js';
 import budgetsRouter from './routes/budgets.js';
 import goalsRouter from './routes/goals.js';
@@ -30,7 +32,9 @@ app.get('/', (_req, res) => {
   res.json({ status: 'ok', service: 'finance-tracker-backend' });
 });
 
-// --- API routes (frontend) ---
+// --- API routes (frontend) — all require a signed-in user ---
+app.use('/api', requireAuth);
+app.use('/api/me', meRouter);
 app.use('/api/transactions', transactionsRouter);
 app.use('/api/budgets', budgetsRouter);
 app.use('/api/goals', goalsRouter);

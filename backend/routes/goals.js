@@ -1,15 +1,23 @@
 import { Router } from 'express';
 import { supabase } from '../lib/supabase.js';
+import { targetSpace } from '../lib/scope.js';
 
 const router = Router();
 
-// GET /api/goals — list saving goals, oldest first.
-router.get('/', async (_req, res, next) => {
+// GET /api/goals — list saving goals in the user's spaces, oldest first.
+// Optional ?space= to narrow to one owned space.
+router.get('/', async (req, res, next) => {
   try {
-    const { data, error } = await supabase
+    let query = supabase
       .from('goals')
       .select('*')
+      .in('space_id', req.spaceIds)
       .order('created_at', { ascending: true });
+    if (req.query.space) {
+      if (!req.spaceIds.includes(req.query.space)) throw badRequest('invalid space');
+      query = query.eq('space_id', req.query.space);
+    }
+    const { data, error } = await query;
     if (error) throw new Error(error.message);
     res.json(data);
   } catch (err) {
@@ -39,6 +47,8 @@ router.post('/', async (req, res, next) => {
       current_amount: current_amount !== undefined ? Math.max(0, Number(current_amount) || 0) : 0,
       deadline: deadline || null,
       color: color ? String(color).trim() : null,
+      space_id: targetSpace(req, req.body?.space_id),
+      created_by: req.user.id,
     };
 
     const { data, error } = await supabase.from('goals').insert(row).select().single();
@@ -69,6 +79,7 @@ router.put('/:id', async (req, res, next) => {
     if (current_amount !== undefined) updates.current_amount = Math.max(0, Number(current_amount) || 0);
     if (deadline !== undefined) updates.deadline = deadline || null;
     if (color !== undefined) updates.color = color ? String(color).trim() : null;
+    if (req.body?.space_id !== undefined) updates.space_id = targetSpace(req, req.body.space_id);
 
     // "Add funds" increments the current saved amount; resolved against the row.
     const delta = Number(add_funds);
@@ -77,6 +88,7 @@ router.put('/:id', async (req, res, next) => {
         .from('goals')
         .select('current_amount')
         .eq('id', req.params.id)
+        .in('space_id', req.spaceIds)
         .maybeSingle();
       if (readErr) throw new Error(readErr.message);
       if (!goal) return res.status(404).json({ error: 'Goal not found' });
@@ -89,6 +101,7 @@ router.put('/:id', async (req, res, next) => {
       .from('goals')
       .update(updates)
       .eq('id', req.params.id)
+      .in('space_id', req.spaceIds)
       .select()
       .maybeSingle();
     if (error) throw new Error(error.message);
@@ -107,6 +120,7 @@ router.delete('/:id', async (req, res, next) => {
       .from('goals')
       .delete()
       .eq('id', req.params.id)
+      .in('space_id', req.spaceIds)
       .select()
       .maybeSingle();
     if (error) throw new Error(error.message);

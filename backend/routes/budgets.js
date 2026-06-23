@@ -1,20 +1,35 @@
 import { Router } from 'express';
 import { supabase } from '../lib/supabase.js';
 import { monthRange, currentPeriod } from '../lib/period.js';
+import { targetSpace } from '../lib/scope.js';
 
 const router = Router();
 
-// GET /api/budgets — budgets for a month (default current), each with a
-// computed `spent` = sum of that category's expenses in the same month.
+function badRequest(message) {
+  const err = new Error(message);
+  err.status = 400;
+  return err;
+}
+
+// Which single space this request operates on: ?space= (if owned) or personal.
+function spaceFor(req) {
+  const s = req.query.space || req.body?.space_id;
+  return s && req.spaceIds.includes(s) ? s : req.personalSpaceId;
+}
+
+// GET /api/budgets — budgets for a month in one space (default: personal),
+// each with a computed `spent` = sum of that category's expenses that month.
 router.get('/', async (req, res, next) => {
   try {
     const fallback = currentPeriod();
     const month = Number(req.query.month) || fallback.month;
     const year = Number(req.query.year) || fallback.year;
+    const space = spaceFor(req);
 
     const { data: budgets, error } = await supabase
       .from('budgets')
       .select('*')
+      .eq('space_id', space)
       .eq('month', month)
       .eq('year', year)
       .order('category');
@@ -24,6 +39,7 @@ router.get('/', async (req, res, next) => {
     const { data: txns, error: txErr } = await supabase
       .from('transactions')
       .select('category, amount')
+      .eq('space_id', space)
       .eq('type', 'expense')
       .gte('transaction_date', start)
       .lt('transaction_date', end);
@@ -40,15 +56,9 @@ router.get('/', async (req, res, next) => {
   }
 });
 
-function badRequest(message) {
-  const err = new Error(message);
-  err.status = 400;
-  return err;
-}
-
-// POST /api/budgets — create or update a budget for a category/month.
-// Body: { category, monthly_limit, month?, year? } (period defaults to current).
-// Upserts on the (category, month, year) unique key.
+// POST /api/budgets — create or update a budget for a category/month in a space.
+// Body: { category, monthly_limit, month?, year?, space_id? } (defaults: current
+// period, personal space). Upserts on (space_id, category, month, year).
 router.post('/', async (req, res, next) => {
   try {
     const fallback = currentPeriod();
@@ -64,8 +74,15 @@ router.post('/', async (req, res, next) => {
     const { data, error } = await supabase
       .from('budgets')
       .upsert(
-        { category: String(category).trim(), monthly_limit: limit, month, year },
-        { onConflict: 'category,month,year' }
+        {
+          category: String(category).trim(),
+          monthly_limit: limit,
+          month,
+          year,
+          space_id: targetSpace(req, req.body?.space_id),
+          created_by: req.user.id,
+        },
+        { onConflict: 'space_id,category,month,year' }
       )
       .select()
       .single();
@@ -84,6 +101,7 @@ router.delete('/:id', async (req, res, next) => {
       .from('budgets')
       .delete()
       .eq('id', req.params.id)
+      .in('space_id', req.spaceIds)
       .select()
       .maybeSingle();
     if (error) throw new Error(error.message);

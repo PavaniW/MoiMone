@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { supabase } from '../lib/supabase.js';
 import { monthRange } from '../lib/period.js';
 import { PAYMENT_METHODS } from '../services/parser.js';
+import { targetSpace } from '../lib/scope.js';
 
 const router = Router();
 
@@ -11,18 +12,29 @@ function cleanLast4(value) {
   return digits.length === 4 ? digits : null;
 }
 
-// GET /api/transactions — list transactions, newest first.
-// Optional query: ?month=&year= (calendar-month filter), ?limit=, ?category=,
-// ?source=, ?type=.
+// Reject a request with a 400 the error handler will surface to the client.
+function badRequest(message) {
+  const err = new Error(message);
+  err.status = 400;
+  return err;
+}
+
+// GET /api/transactions — list transactions in the user's spaces, newest first.
+// Optional query: ?month=&year=, ?limit=, ?category=, ?source=, ?type=, ?space=.
 router.get('/', async (req, res, next) => {
   try {
-    const { month, year, limit, category, source, type } = req.query;
+    const { month, year, limit, category, source, type, space } = req.query;
 
     let query = supabase
       .from('transactions')
       .select('*')
+      .in('space_id', req.spaceIds) // only spaces this user belongs to
       .order('transaction_date', { ascending: false });
 
+    if (space) {
+      if (!req.spaceIds.includes(space)) throw badRequest('invalid space');
+      query = query.eq('space_id', space);
+    }
     if (month && year) {
       const { start, end } = monthRange(month, year);
       query = query.gte('transaction_date', start).lt('transaction_date', end);
@@ -40,13 +52,6 @@ router.get('/', async (req, res, next) => {
     next(err);
   }
 });
-
-// Reject a request with a 400 the error handler will surface to the client.
-function badRequest(message) {
-  const err = new Error(message);
-  err.status = 400;
-  return err;
-}
 
 // POST /api/transactions — manual transaction entry.
 // Body: { amount, type, category, merchant?, description?, transaction_date? }.
@@ -74,6 +79,8 @@ router.post('/', async (req, res, next) => {
       payment_method: payment_method || null,
       card_last4: cleanLast4(card_last4),
       source: 'manual',
+      space_id: targetSpace(req, req.body?.space_id),
+      created_by: req.user.id,
     };
     if (transaction_date) row.transaction_date = new Date(transaction_date).toISOString();
 
@@ -123,6 +130,8 @@ router.put('/:id', async (req, res, next) => {
       updates.payment_method = payment_method || null;
     }
     if (card_last4 !== undefined) updates.card_last4 = cleanLast4(card_last4);
+    // Moving an entry between spaces (e.g. Personal -> Shared).
+    if (req.body?.space_id !== undefined) updates.space_id = targetSpace(req, req.body.space_id);
 
     if (!Object.keys(updates).length) throw badRequest('no fields to update');
 
@@ -130,6 +139,7 @@ router.put('/:id', async (req, res, next) => {
       .from('transactions')
       .update(updates)
       .eq('id', req.params.id)
+      .in('space_id', req.spaceIds) // can only edit rows in your own spaces
       .select()
       .maybeSingle();
     if (error) throw new Error(error.message);
@@ -148,6 +158,7 @@ router.delete('/:id', async (req, res, next) => {
       .from('transactions')
       .delete()
       .eq('id', req.params.id)
+      .in('space_id', req.spaceIds) // can only delete rows in your own spaces
       .select()
       .maybeSingle();
     if (error) throw new Error(error.message);
