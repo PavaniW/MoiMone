@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import BudgetBar from '../components/BudgetBar.jsx';
+import Loading, { Spinner } from '../components/Loading.jsx';
 import { formatAmount, CURRENCY } from '../lib/format.js';
 import { api } from '../lib/api.js';
 
@@ -110,7 +111,7 @@ export default function Budgets() {
     }
   }
 
-  if (status === 'loading') return <div className="dash-state">Loading budgets…</div>;
+  if (status === 'loading') return <Loading label="Loading budgets…" />;
   if (status === 'error') {
     return (
       <div className="dash-state">
@@ -170,7 +171,7 @@ export default function Budgets() {
             {error && <p className="form-error">{error}</p>}
             <div className="form-actions">
               <button className="btn-primary" type="submit" disabled={saving}>
-                {saving ? 'Saving…' : 'Save limit'}
+                {saving ? <><Spinner size={14} />Saving…</> : 'Save limit'}
               </button>
             </div>
           </form>

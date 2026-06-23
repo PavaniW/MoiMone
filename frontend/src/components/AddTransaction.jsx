@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { api } from '../lib/api.js';
+import { Spinner } from './Loading.jsx';
 
 // Today as yyyy-mm-dd for the date input default.
 function today() {
@@ -186,7 +187,7 @@ export default function AddTransaction({ categories = [], cards = [], initial = 
           </button>
         )}
         <button className="btn-primary" type="submit" disabled={saving}>
-          {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Add entry'}
+          {saving ? <><Spinner size={14} />Saving…</> : isEdit ? 'Save changes' : 'Add entry'}
         </button>
       </div>
     </form>

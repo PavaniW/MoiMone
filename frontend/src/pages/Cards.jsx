@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
+import Loading, { Spinner } from '../components/Loading.jsx';
 
 const SWATCHES = ['#2f6b4f', '#b0563c', '#45B7D1', '#DDA0DD', '#FFC857', '#4ECDC4'];
 const EMPTY = { nickname: '', bank: '', type: 'credit', last4: '', color: SWATCHES[0] };
@@ -63,7 +64,7 @@ export default function Cards() {
     }
   }
 
-  if (status === 'loading') return <div className="dash-state">Loading cards…</div>;
+  if (status === 'loading') return <Loading label="Loading cards…" />;
   if (status === 'error') {
     return (
       <div className="dash-state">
@@ -162,7 +163,7 @@ export default function Cards() {
           {error && <p className="form-error">{error}</p>}
           <div className="form-actions">
             <button className="btn-primary" type="submit" disabled={saving}>
-              {saving ? 'Saving…' : 'Add card'}
+              {saving ? <><Spinner size={14} />Saving…</> : 'Add card'}
             </button>
           </div>
         </form>

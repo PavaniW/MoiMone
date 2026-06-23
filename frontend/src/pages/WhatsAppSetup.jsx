@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
+import Loading, { Spinner } from '../components/Loading.jsx';
 
 // WhatsApp — register the number that maps inbound messages to this account,
 // and explain how to log expenses by texting the bot.
@@ -37,7 +38,7 @@ export default function WhatsAppSetup() {
     }
   }
 
-  if (status === 'loading') return <div className="dash-state">Loading…</div>;
+  if (status === 'loading') return <Loading />;
   if (status === 'error') {
     return (
       <div className="dash-state">
@@ -88,7 +89,7 @@ export default function WhatsAppSetup() {
           )}
           <div className="form-actions">
             <button className="btn-primary" type="submit" disabled={saving}>
-              {saving ? 'Saving…' : 'Save number'}
+              {saving ? <><Spinner size={14} />Saving…</> : 'Save number'}
             </button>
           </div>
         </form>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import Loading from '../components/Loading.jsx';
 import SpendingChart from '../components/SpendingChart.jsx';
 import BudgetBar from '../components/BudgetBar.jsx';
 import TransactionItem from '../components/TransactionItem.jsx';
@@ -101,7 +102,7 @@ export default function Dashboard() {
   }, []);
 
   if (state.status === 'loading') {
-    return <div className="dash-state">Loading your statement…</div>;
+    return <Loading label="Loading your statement…" />;
   }
   if (state.status === 'error') {
     return (

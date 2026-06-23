@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import GoalCard from '../components/GoalCard.jsx';
+import Loading, { Spinner } from '../components/Loading.jsx';
 import { CURRENCY } from '../lib/format.js';
 import { api } from '../lib/api.js';
 
@@ -79,7 +80,7 @@ export default function Goals() {
     }
   }
 
-  if (status === 'loading') return <div className="dash-state">Loading goals…</div>;
+  if (status === 'loading') return <Loading label="Loading goals…" />;
   if (status === 'error') {
     return (
       <div className="dash-state">
@@ -155,7 +156,7 @@ export default function Goals() {
           {error && <p className="form-error">{error}</p>}
           <div className="form-actions">
             <button className="btn-primary" type="submit" disabled={saving}>
-              {saving ? 'Saving…' : 'Create goal'}
+              {saving ? <><Spinner size={14} />Saving…</> : 'Create goal'}
             </button>
           </div>
         </form>

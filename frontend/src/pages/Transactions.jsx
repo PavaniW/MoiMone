@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import AddTransaction from '../components/AddTransaction.jsx';
+import Loading from '../components/Loading.jsx';
 import { formatAmount, formatDay, formatCard, CURRENCY } from '../lib/format.js';
 import { api } from '../lib/api.js';
 
@@ -122,7 +123,7 @@ export default function Transactions() {
     }
   }
 
-  if (status === 'loading') return <div className="dash-state">Loading transactions…</div>;
+  if (status === 'loading') return <Loading label="Loading transactions…" />;
   if (status === 'error') {
     return (
       <div className="dash-state">

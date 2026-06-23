@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
+import Loading from '../components/Loading.jsx';
 
 // One labelled value with a copy button.
 function CopyField({ label, value, mono = true }) {
@@ -59,7 +60,7 @@ export default function SmsSetup() {
     }
   }
 
-  if (state.status === 'loading') return <div className="dash-state">Loading…</div>;
+  if (state.status === 'loading') return <Loading />;
   if (state.status === 'error') {
     return (
       <div className="dash-state">

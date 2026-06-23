@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../auth.jsx';
+import { Spinner } from '../components/Loading.jsx';
 
 // Google's 4-color "G" mark.
 function GoogleMark() {
@@ -42,7 +43,7 @@ export default function Login() {
         <h1 className="login-logo">MoiMone</h1>
         <p className="login-sub">Personal Finance</p>
         <button className="google-btn" onClick={go} disabled={busy}>
-          <GoogleMark />
+          {busy ? <Spinner size={16} /> : <GoogleMark />}
           {busy ? 'Redirecting…' : 'Continue with Google'}
         </button>
         <p className="login-fine">Your finances are private to your account.</p>

@@ -9,6 +9,7 @@ import Settings from './pages/Settings.jsx';
 import SmsSetup from './pages/SmsSetup.jsx';
 import WhatsAppSetup from './pages/WhatsAppSetup.jsx';
 import Login from './pages/Login.jsx';
+import Loading from './components/Loading.jsx';
 import { useAuth } from './auth.jsx';
 import { isSupabaseConfigured } from './lib/supabase.js';
 
@@ -85,7 +86,7 @@ export default function App() {
       </div>
     );
   }
-  if (loading) return <div className="dash-state">Loading…</div>;
+  if (loading) return <Loading label="Starting MoiMone…" />;
   if (!session) return <Login />;
 
   return (
