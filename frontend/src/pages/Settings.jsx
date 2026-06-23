@@ -16,6 +16,14 @@ const CardIcon = () => (
     <line x1="2" y1="10" x2="22" y2="10" />
   </svg>
 );
+const SharedIcon = () => (
+  <svg {...svgProps}>
+    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="3" />
+    <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+  </svg>
+);
 const TagIcon = () => (
   <svg {...svgProps}>
     <path d="M20.59 13.41 13.42 20.6a2 2 0 0 1-2.83 0L3 13V3h10l7.59 7.59a2 2 0 0 1 0 2.82z" />
@@ -73,6 +81,11 @@ export default function Settings() {
         <Link to="/categories" className="settings-row">
           <TagIcon />
           <span className="settings-row-label">Categories</span>
+          <Chevron />
+        </Link>
+        <Link to="/household" className="settings-row">
+          <SharedIcon />
+          <span className="settings-row-label">Shared Space</span>
           <Chevron />
         </Link>
         <Link to="/sms-setup" className="settings-row">

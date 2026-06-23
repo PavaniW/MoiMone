@@ -1547,3 +1547,78 @@ body {
     transition: none;
   }
 }
+
+/* ---------- Space switcher (Personal / Shared) ---------- */
+/* Lives in the dark sidebar / mobile header, so it's styled to match that:
+   custom chevron (appearance:none avoids the doubled native arrow). */
+.space-switcher {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin: 0.4rem 0 1.4rem;
+}
+.space-switcher-label {
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #7f917f;
+}
+.space-switcher-select {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  font-family: var(--display);
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #f7f8f3;
+  background-color: rgba(255, 255, 255, 0.07);
+  border: 1px solid #2c3b33;
+  border-radius: 8px;
+  padding: 0.5rem 2rem 0.5rem 0.65rem;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23aebbae' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 0.6rem center;
+}
+.space-switcher-select:hover {
+  background-color: rgba(255, 255, 255, 0.11);
+}
+.space-switcher-select:focus {
+  outline: none;
+  border-color: var(--green);
+}
+/* Native option list renders light (OS-controlled); keep text dark there. */
+.space-switcher-select option {
+  color: var(--ink);
+  background: var(--panel);
+}
+
+/* Small "by Name" / "owner" tag */
+.who-tag {
+  display: inline-block;
+  margin-left: 0.4rem;
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+  background: var(--bar);
+  border-radius: 6px;
+  padding: 0.06rem 0.36rem;
+  vertical-align: middle;
+}
+
+@media (max-width: 640px) {
+  /* Drop the switcher onto its own full-width row below the brand/settings,
+     so it isn't cramped in the header. */
+  .space-switcher {
+    order: 99;
+    flex: 1 1 100%;
+    margin: 0.55rem 0 0;
+  }
+  .space-switcher-label {
+    display: none;
+  }
+}

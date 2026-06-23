@@ -6,11 +6,14 @@ import Goals from './pages/Goals.jsx';
 import Chat from './pages/Chat.jsx';
 import Cards from './pages/Cards.jsx';
 import Categories from './pages/Categories.jsx';
+import Household from './pages/Household.jsx';
 import Settings from './pages/Settings.jsx';
 import SmsSetup from './pages/SmsSetup.jsx';
 import WhatsAppSetup from './pages/WhatsAppSetup.jsx';
 import Login from './pages/Login.jsx';
 import Loading from './components/Loading.jsx';
+import SpaceSwitcher from './components/SpaceSwitcher.jsx';
+import { SpaceProvider } from './space.jsx';
 import { useAuth } from './auth.jsx';
 import { isSupabaseConfigured } from './lib/supabase.js';
 
@@ -91,10 +94,12 @@ export default function App() {
   if (!session) return <Login />;
 
   return (
+    <SpaceProvider>
     <div className="app">
       <aside className="sidebar">
         <h1 className="logo">MoiMone</h1>
         <p className="logo-sub">Personal Finance</p>
+        <SpaceSwitcher />
         <nav>
           {nav.map((item) => (
             <NavLink
@@ -139,6 +144,7 @@ export default function App() {
           <Route path="/chat" element={<Chat />} />
           <Route path="/cards" element={<Cards />} />
           <Route path="/categories" element={<Categories />} />
+          <Route path="/household" element={<Household />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/sms-setup" element={<SmsSetup />} />
           <Route path="/whatsapp" element={<WhatsAppSetup />} />
@@ -160,5 +166,6 @@ export default function App() {
         ))}
       </nav>
     </div>
+    </SpaceProvider>
   );
 }

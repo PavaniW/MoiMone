@@ -5,6 +5,7 @@ import BudgetBar from '../components/BudgetBar.jsx';
 import TransactionItem from '../components/TransactionItem.jsx';
 import { formatAmount, formatCard, cardKey, CURRENCY } from '../lib/format.js';
 import { api } from '../lib/api.js';
+import { useSpace } from '../space.jsx';
 
 const now = new Date();
 const PERIOD = {
@@ -77,17 +78,21 @@ function build(categories, cards, monthTxns, recentTxns, budgetRows) {
 // Page 1 — Dashboard, styled as a personal statement. Live data via the backend API.
 export default function Dashboard() {
   const [state, setState] = useState({ status: 'loading' });
+  const { currentSpaceId } = useSpace();
 
   useEffect(() => {
+    if (!currentSpaceId) return; // wait until the active space is known
     let active = true;
+    setState({ status: 'loading' });
     (async () => {
       try {
-        const period = `?month=${PERIOD.month}&year=${PERIOD.year}`;
+        const sp = `&space=${currentSpaceId}`;
+        const period = `?month=${PERIOD.month}&year=${PERIOD.year}${sp}`;
         const [categories, cards, monthTxns, recentTxns, budgetRows] = await Promise.all([
           api.getCategories(),
           api.getCards(),
           api.getTransactions(period),
-          api.getTransactions('?limit=5'),
+          api.getTransactions(`?limit=5${sp}`),
           api.getBudgets(period),
         ]);
         if (active)
@@ -99,7 +104,7 @@ export default function Dashboard() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [currentSpaceId]);
 
   if (state.status === 'loading') {
     return <Loading label="Loading your statement…" />;

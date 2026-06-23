@@ -41,6 +41,14 @@ export const api = {
   updateWhatsApp: (number) =>
     request('/api/me/whatsapp', { method: 'PUT', body: JSON.stringify({ number }) }),
 
+  // Spaces (personal / shared household)
+  getSpaces: () => request('/api/spaces'),
+  createSpace: (name) => request('/api/spaces', { method: 'POST', body: JSON.stringify({ name }) }),
+  addSpaceMember: (spaceId, email) =>
+    request(`/api/spaces/${spaceId}/members`, { method: 'POST', body: JSON.stringify({ email }) }),
+  removeSpaceMember: (spaceId, userId) =>
+    request(`/api/spaces/${spaceId}/members/${userId}`, { method: 'DELETE' }),
+
   // Transactions
   getTransactions: (params = '') => request(`/api/transactions${params}`),
   createTransaction: (data) =>
@@ -56,7 +64,7 @@ export const api = {
   deleteBudget: (id) => request(`/api/budgets/${id}`, { method: 'DELETE' }),
 
   // Goals
-  getGoals: () => request('/api/goals'),
+  getGoals: (params = '') => request(`/api/goals${params}`),
   createGoal: (data) => request('/api/goals', { method: 'POST', body: JSON.stringify(data) }),
   updateGoal: (id, data) =>
     request(`/api/goals/${id}`, { method: 'PUT', body: JSON.stringify(data) }),

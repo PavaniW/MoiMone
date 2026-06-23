@@ -3,6 +3,7 @@ import GoalCard from '../components/GoalCard.jsx';
 import Loading, { Spinner } from '../components/Loading.jsx';
 import { CURRENCY } from '../lib/format.js';
 import { api } from '../lib/api.js';
+import { useSpace } from '../space.jsx';
 
 const SWATCHES = ['#2f6b4f', '#b0563c', '#45B7D1', '#DDA0DD', '#FFC857', '#4ECDC4'];
 
@@ -16,12 +17,15 @@ export default function Goals() {
 
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
+  const { currentSpaceId } = useSpace();
 
   useEffect(() => {
+    if (!currentSpaceId) return; // wait for the active space
     let active = true;
+    setStatus('loading');
     (async () => {
       try {
-        const data = await api.getGoals();
+        const data = await api.getGoals(`?space=${currentSpaceId}`);
         if (active) {
           setGoals(data);
           setStatus('ready');
@@ -36,7 +40,7 @@ export default function Goals() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [currentSpaceId]);
 
   const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
 
@@ -53,6 +57,7 @@ export default function Goals() {
         target_amount: Number(form.target_amount),
         deadline: form.deadline || null,
         color: form.color,
+        space_id: currentSpaceId,
       });
       setGoals((g) => [...g, created]);
       setForm(EMPTY);

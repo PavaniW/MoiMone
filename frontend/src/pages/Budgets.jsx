@@ -3,6 +3,7 @@ import BudgetBar from '../components/BudgetBar.jsx';
 import Loading, { Spinner } from '../components/Loading.jsx';
 import { formatAmount, CURRENCY } from '../lib/format.js';
 import { api } from '../lib/api.js';
+import { useSpace } from '../space.jsx';
 
 const FALLBACK_COLOR = '#9A9384';
 
@@ -24,16 +25,20 @@ export default function Budgets() {
   const [category, setCategory] = useState('');
   const [limit, setLimit] = useState('');
   const [saving, setSaving] = useState(false);
+  const { currentSpaceId } = useSpace();
 
   async function load() {
-    const [b, cats] = await Promise.all([api.getBudgets(PARAMS), api.getCategories()]);
+    const sp = `&space=${currentSpaceId}`;
+    const [b, cats] = await Promise.all([api.getBudgets(PARAMS + sp), api.getCategories()]);
     setBudgets(b);
     setCategories(cats);
     if (!category) setCategory(cats[0]?.name || '');
   }
 
   useEffect(() => {
+    if (!currentSpaceId) return; // wait for the active space
     let active = true;
+    setStatus('loading');
     (async () => {
       try {
         await load();
@@ -49,7 +54,7 @@ export default function Budgets() {
       active = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [currentSpaceId]);
 
   const colorOf = useMemo(
     () => Object.fromEntries(categories.map((c) => [c.name, c.color])),
@@ -90,6 +95,7 @@ export default function Budgets() {
         monthly_limit: Number(limit),
         month: PERIOD.month,
         year: PERIOD.year,
+        space_id: currentSpaceId,
       });
       setLimit('');
       await load();

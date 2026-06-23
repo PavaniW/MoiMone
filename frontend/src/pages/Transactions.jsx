@@ -3,6 +3,7 @@ import AddTransaction from '../components/AddTransaction.jsx';
 import Loading from '../components/Loading.jsx';
 import { formatAmount, formatDay, formatCard, CURRENCY } from '../lib/format.js';
 import { api } from '../lib/api.js';
+import { useSpace } from '../space.jsx';
 
 const FALLBACK_COLOR = '#9A9384';
 const SOURCES = ['sms', 'email', 'whatsapp', 'manual'];
@@ -26,6 +27,7 @@ export default function Transactions() {
   const [cards, setCards] = useState([]);
   const [showAdd, setShowAdd] = useState(false);
   const [editing, setEditing] = useState(null); // transaction being edited, or null
+  const { currentSpaceId, currentSpace } = useSpace();
 
   const [q, setQ] = useState('');
   const [category, setCategory] = useState('');
@@ -34,11 +36,13 @@ export default function Transactions() {
   const [card, setCard] = useState('');
 
   useEffect(() => {
+    if (!currentSpaceId) return; // wait for the active space
     let active = true;
+    setStatus('loading');
     (async () => {
       try {
         const [txns, cats, cds] = await Promise.all([
-          api.getTransactions(),
+          api.getTransactions(`?space=${currentSpaceId}`),
           api.getCategories(),
           api.getCards(),
         ]);
@@ -58,7 +62,17 @@ export default function Transactions() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [currentSpaceId]);
+
+  // For shared spaces: map a member's user id → display name ("You" for self).
+  const memberName = useMemo(
+    () =>
+      Object.fromEntries(
+        (currentSpace?.members || []).map((m) => [m.userId, m.isYou ? 'You' : m.name])
+      ),
+    [currentSpace]
+  );
+  const isShared = currentSpace?.kind === 'shared';
 
   const colorOf = useMemo(
     () => Object.fromEntries(categories.map((c) => [c.name, c.color])),
@@ -147,7 +161,12 @@ export default function Transactions() {
 
       {showAdd && (
         <div className="panel" style={{ marginTop: '1.25rem' }}>
-          <AddTransaction categories={categories} cards={cards} onCreated={handleCreated} />
+          <AddTransaction
+            categories={categories}
+            cards={cards}
+            spaceId={currentSpaceId}
+            onCreated={handleCreated}
+          />
         </div>
       )}
 
@@ -229,6 +248,9 @@ export default function Transactions() {
                     <span className="merchant-text">
                       {t.merchant || '—'}
                       {label && <span className="card-tag">{label}</span>}
+                      {isShared && memberName[t.created_by] && (
+                        <span className="who-tag">by {memberName[t.created_by]}</span>
+                      )}
                     </span>
                   </span>
                   <span className="hide-sm">

@@ -40,7 +40,7 @@ function toForm(categories, t) {
 //   • create mode (no `initial`): saves a new row, calls onCreated(row)
 //   • edit mode (`initial` set): updates that row, calls onUpdated(row)
 // onCancel, when provided, renders a Cancel button (used by the edit modal).
-export default function AddTransaction({ categories = [], cards = [], initial = null, onCreated, onUpdated, onCancel }) {
+export default function AddTransaction({ categories = [], cards = [], spaceId = null, initial = null, onCreated, onUpdated, onCancel }) {
   const isEdit = Boolean(initial);
   const [form, setForm] = useState(() => toForm(categories, initial));
   const [saving, setSaving] = useState(false);
@@ -84,7 +84,7 @@ export default function AddTransaction({ categories = [], cards = [], initial = 
         const updated = await api.updateTransaction(initial.id, payload);
         onUpdated?.(updated);
       } else {
-        const created = await api.createTransaction(payload);
+        const created = await api.createTransaction({ ...payload, space_id: spaceId });
         setForm(toForm(categories, null));
         onCreated?.(created);
       }
