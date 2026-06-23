@@ -5,6 +5,10 @@ For free-tier limits and operational gotchas, see [OPERATIONS.md](./OPERATIONS.m
 
 ## Diagram
 
+> 📊 **Just want to see it?** Open [`architecture.html`](./architecture.html) in
+> any browser — it's a self-contained render of the diagram below (no tools, no
+> internet needed). The Mermaid source below also renders natively on GitHub.
+
 ```mermaid
 flowchart TB
   %% ---------- Clients / inputs ----------
