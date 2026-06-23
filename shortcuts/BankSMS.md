@@ -17,7 +17,7 @@ in. Keep it secret; it can be rotated if ever needed.
 2. Trigger: **Message** → **Message Contains** = a phrase always in your bank texts
    (for example: `authorised on your`). Choose **Run Immediately**.
 3. Add action **Get Contents of URL**:
-   - **URL**: `https://moimone.netlify.app/webhook/sms`
+   - **URL**: `https://moi-mone.vercel.app/webhook/sms`
    - **Show More** → **Method**: `POST`
    - **Headers**: `Content-Type` = `application/json`
    - **Request Body**: `JSON`
@@ -29,7 +29,7 @@ in. Keep it secret; it can be rotated if ever needed.
 Send yourself (or have someone send) a message containing your trigger word:
 
 ```bash
-curl -X POST https://moimone.netlify.app/webhook/sms \
+curl -X POST https://moi-mone.vercel.app/webhook/sms \
   -H 'Content-Type: application/json' \
   -d '{"text":"Your card was debited LKR 450.00 at Cargills","token":"<YOUR_INGEST_TOKEN>"}'
 ```

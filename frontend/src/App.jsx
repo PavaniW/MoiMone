@@ -82,7 +82,7 @@ export default function App() {
         <p className="dash-state-title">Sign-in not configured yet</p>
         <p className="dash-state-hint">
           Set <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code> (in
-          <code> frontend/.env</code> locally, or as Netlify env vars) and reload.
+          <code> frontend/.env</code> locally, or as Vercel env vars) and reload.
         </p>
       </div>
     );

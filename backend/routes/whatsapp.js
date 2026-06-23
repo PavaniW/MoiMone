@@ -4,7 +4,6 @@ import { parseTransaction, DEFAULT_CURRENCY } from '../services/parser.js';
 import { userCategoryNames } from '../lib/categories.js';
 import { supabase } from '../lib/supabase.js';
 import { monthRange, currentPeriod } from '../lib/period.js';
-import { verifyWebhookToken } from '../middleware/auth.js';
 import { userByWhatsApp, matchUserCard } from '../lib/ingest.js';
 
 const router = Router();
@@ -17,34 +16,33 @@ function reply(res, message) {
   res.type('text/xml').send(twiml.toString());
 }
 
-// Authenticate inbound requests so the endpoint is never open.
-//   • Twilio configured (TWILIO_AUTH_TOKEN set) → require a valid Twilio
-//     signature. The signed URL must match the public webhook URL, so we
-//     rebuild it from the proxy (ngrok) forwarding headers.
-//   • Otherwise → fall back to the shared WEBHOOK_SECRET_TOKEN (body.token or
-//     Authorization: Bearer), same as /webhook/sms.
-// Set TWILIO_SKIP_VALIDATION=true to force the token path while debugging a tunnel.
+// Authenticate inbound requests so the endpoint is never open: require a valid
+// Twilio signature, computed over the public webhook URL (rebuilt from the
+// proxy's forwarding headers so it matches what Twilio signed). Set
+// TWILIO_SKIP_VALIDATION=true to bypass while debugging a local tunnel.
 function authenticate(req, res, next) {
-  const twilioToken = process.env.TWILIO_AUTH_TOKEN;
+  if (process.env.TWILIO_SKIP_VALIDATION === 'true') return next();
 
-  if (twilioToken && process.env.TWILIO_SKIP_VALIDATION !== 'true') {
-    const proto = req.headers['x-forwarded-proto'] || req.protocol;
-    const host = req.headers['x-forwarded-host'] || req.get('host');
-    const url = `${proto}://${host}${req.originalUrl}`;
-    const valid = twilio.validateRequest(
-      twilioToken,
-      req.headers['x-twilio-signature'],
-      url,
-      req.body || {}
-    );
-    if (!valid) {
-      console.warn(`Twilio signature validation failed for ${url}`);
-      return res.status(403).type('text/xml').send('<Response></Response>');
-    }
-    return next();
+  const twilioToken = process.env.TWILIO_AUTH_TOKEN;
+  if (!twilioToken) {
+    console.warn('TWILIO_AUTH_TOKEN not set — rejecting WhatsApp webhook');
+    return res.status(500).type('text/xml').send('<Response></Response>');
   }
 
-  return verifyWebhookToken(req, res, next);
+  const proto = req.headers['x-forwarded-proto'] || req.protocol;
+  const host = req.headers['x-forwarded-host'] || req.get('host');
+  const url = `${proto}://${host}${req.originalUrl}`;
+  const valid = twilio.validateRequest(
+    twilioToken,
+    req.headers['x-twilio-signature'],
+    url,
+    req.body || {}
+  );
+  if (!valid) {
+    console.warn(`Twilio signature validation failed for ${url}`);
+    return res.status(403).type('text/xml').send('<Response></Response>');
+  }
+  return next();
 }
 
 // "Budget remaining" line for the confirmation, scoped to this user's space.

@@ -1,8 +1,8 @@
 import { supabase } from './supabase.js';
 
 // Thin wrapper around the backend API.
-// Default: same-origin in production (the API is a Netlify function on the same
-// domain, reached via /api/*), and the local Express server during dev. Set
+// Default: same-origin in production (the API is a serverless function on the
+// same domain, reached via /api/*), and the local Express server during dev. Set
 // VITE_API_URL to override — e.g. when the backend is hosted separately.
 const BASE =
   import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://localhost:3000' : '');
