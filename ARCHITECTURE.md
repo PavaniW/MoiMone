@@ -1,54 +1,103 @@
 # Architecture
 
-How data flows into and out of the personal finance tracker.
+How data flows into and out of MoiMone — a multi-user personal finance tracker.
+For free-tier limits and operational gotchas, see [OPERATIONS.md](./OPERATIONS.md).
 
 ## Diagram
 
 ```mermaid
 flowchart TB
-  %% ---------- Data in (writes) ----------
-  SMS["📱 Bank sends SMS"] --> SC["iOS Shortcut<br/>(automation)"]
-  WAU["💬 You message<br/>WhatsApp number"] --> TW["Twilio"]
-  ME["✍️ Manual entry<br/>(future)"]
+  %% ---------- Clients / inputs ----------
+  SMS["📱 Bank SMS"] --> SC["iOS Shortcut<br/>(automation)"]
+  WAU["💬 WhatsApp message"] --> TW["Twilio<br/>(WhatsApp sandbox)"]
+  USERS["🧑‍🤝‍🧑 You + fiancé<br/>separate Google accounts"] --> WEB["🖥️ Web app<br/>React/Vite (static on Vercel)"]
 
-  SC -- "POST /webhook/sms<br/>{text, token}" --> BE
-  TW -- "POST /webhook/whatsapp<br/>{Body} + signature" --> BE
-  ME -- "POST /api/transactions" --> BE
+  %% ---------- Auth ----------
+  WEB -- "Google OAuth" --> SBAUTH["Supabase Auth → JWT"]
 
-  %% ---------- Backend ----------
-  subgraph BACKEND["⚙️ Backend — Express (Render cloud, or localhost)"]
-    BE["Routes + auth<br/>(secret token / Twilio signature)"] --> PARSE["Parse message"]
-    PARSE --> NORM["Normalize<br/>(valid category / type / amount)"]
+  %% ---------- Requests into backend ----------
+  SC  -- "POST /webhook/sms<br/>{text, ingest_token}" --> BE
+  TW  -- "POST /webhook/whatsapp<br/>{Body} + Twilio signature" --> BE
+  WEB -- "/api/* (manual entry, edits,<br/>budgets, goals, cards, categories)<br/>Authorization: Bearer JWT" --> BE
+  WEB -- "POST /api/chat (question)" --> BE
+
+  %% ---------- Backend: Express as ONE Vercel function, same-origin /api ----------
+  subgraph BACKEND["⚙️ Backend — Express as one Vercel serverless function"]
+    BE["Routes"] --> AUTH{"Identify &<br/>authenticate user"}
+    AUTH -- "JWT → Supabase getUser" --> SCOPE
+    AUTH -- "ingest_token → owner" --> SCOPE
+    AUTH -- "phone # + Twilio sig → owner" --> SCOPE
+    SCOPE["Scope to user's space<br/>(space_id + created_by)"]
+    SCOPE --> PARSE["Parse raw bank text"]
+    SCOPE --> CHATCTX["Build finance context<br/>(recent txns, budgets, goals)"]
+    PARSE --> NORM["Normalize<br/>(category from user's own list)"]
   end
 
-  PARSE <-. "JSON" .-> LLM["🧠 LLM parser<br/>Ollama (local) ·<br/>Groq (cloud) · Claude (paid)"]
+  %% ---------- AI (parser + chat) ----------
+  PARSE  <-. "raw text → JSON" .-> LLM
+  CHATCTX <-. "context + question → answer" .-> LLM
+  LLM["🧠 LLM<br/>Groq (cloud, active) ·<br/>Ollama (local dev) ·<br/>Anthropic (fallback)"]
 
   %% ---------- Database ----------
-  NORM -- "INSERT" --> DB[("🗄️ Supabase / Postgres<br/>transactions · budgets ·<br/>goals · categories<br/>(RLS on; backend uses secret key)")]
+  NORM  -- "INSERT" --> DB
+  SCOPE -- "SELECT / UPDATE / DELETE" --> DB
+  DB[("🗄️ Supabase / Postgres<br/>profiles · spaces · space_members<br/>transactions · budgets · goals<br/>categories (per-user) · cards")]
 
-  %% ---------- WhatsApp reply ----------
-  TW -. "TwiML reply: ✅ Logged…" .-> WAU
-
-  %% ---------- Reads ----------
-  DASH["🖥️ Dashboard (React/Vite)"] -- "GET /api/transactions,<br/>/budgets, /goals, /categories" --> BE
-  DB -- "rows (SELECT)" --> BE
-  BE -- "JSON" --> DASH
+  %% ---------- Replies ----------
+  TW -. "✅ Logged… (TwiML reply)" .-> WAU
+  BE -- "JSON" --> WEB
 ```
 
 ## In words
 
-**Writes (money in/out get recorded):**
-1. Your **bank sends an SMS** → an **iOS Shortcut automation** auto-forwards the text to `POST /webhook/sms` with the secret token.
-2. You **message a WhatsApp number** → **Twilio** forwards it to `POST /webhook/whatsapp` (verified by Twilio signature, or the token locally).
-3. **Manual entry** (future) posts straight to `POST /api/transactions`.
+### Who's who (multi-user)
+Each person signs in with their **own Google account** (Supabase Auth → JWT).
+Data is **private by default**: every row carries a `space_id` (which ledger it
+lives in) and `created_by` (who added it). Today everyone has a personal space;
+a shared "household" space is the planned Phase 2.
 
-All three land in the **backend**, which: authenticates the request → sends the raw text to the **LLM parser** (Ollama locally, Groq in the cloud, or Claude) → gets back structured JSON `{amount, currency, merchant, type, category}` → normalizes it → **INSERTs a row into Supabase**. WhatsApp additionally gets a confirmation reply.
+### Writes — money in/out gets recorded
+Four entry points, all landing in the backend, each identifying *which user*:
+1. **Bank SMS** → an **iOS Shortcut** forwards the text to `POST /webhook/sms`
+   with that user's **ingest token** (the token both authenticates *and* says
+   whose account it is).
+2. **WhatsApp message** → **Twilio** forwards it to `POST /webhook/whatsapp`,
+   authenticated by **Twilio signature** and matched to a user by their
+   **registered phone number**.
+3. **Manual entry / edits** (web app) → `POST/PUT /api/transactions` with the
+   user's **JWT**.
+4. **In-app Chat** → `POST /api/chat` (see below).
 
-**Reads (you look at your money):**
-- The **Dashboard** calls the backend API (`GET /api/transactions`, `/budgets`, `/goals`, `/categories`); the backend runs `SELECT`s against Supabase and returns JSON, which the UI renders as the spending chart, budget bars, and recent entries.
+For SMS & WhatsApp the backend sends the raw text to the **LLM parser**, gets
+back structured JSON `{amount, currency, merchant, type, category, …}`,
+**normalizes** it against *that user's* category list, auto-links a registered
+**card** by last-4 digits, and **INSERTs** the row scoped to the user's space.
+WhatsApp also gets a confirmation reply.
 
-**Two environments, same database:**
-- **Local dev** — backend on `localhost:3000`, parser = **Ollama** (free, on your Mac), frontend on `localhost:5173`.
-- **Deployed** — backend on **Render** (public HTTPS, always-on), parser = **Groq** (free, hosted); the iOS Shortcut points at the Render URL. Both talk to the **same Supabase**, so data is shared.
+### Reads — looking at your money
+The web app calls `GET /api/transactions · /budgets · /goals · /categories ·
+/cards`; the backend runs scoped `SELECT`s against Supabase and returns JSON,
+rendered as the dashboard chart, budget bars, goals, and recent entries.
 
-**Security:** secrets live only in `.env` (gitignored) / Render env vars; webhooks require a token; Supabase has RLS on and only the backend's secret key can read/write.
+### In-app AI Chat
+`POST /api/chat` assembles a compact summary of the user's own finances (recent
+transactions, per-category totals, budgets, goals), sends it with the question
+to the **LLM**, and returns a natural-language answer — using only that user's
+data.
+
+### Two environments, same database
+- **Local dev** — backend on `localhost:3000`, parser = **Ollama** (free, on the
+  Mac), frontend on `localhost:5173`.
+- **Production** — frontend + backend deployed together on **Vercel**
+  (`moi-mone.vercel.app`, same-origin `/api`), parser = **Groq** (free, hosted).
+  Both point at the **same Supabase**, so data is shared.
+
+### Security
+- Supabase **service-role key** is backend-only (never in the browser); the
+  browser uses the public **anon key** for Google login.
+- Webhooks are authenticated — SMS by per-user **ingest token**, WhatsApp by
+  **Twilio signature**.
+- Access is scoped in code by `space_id` / `created_by`, so one user can't read
+  another's private rows.
+- All secrets live in `.env` (gitignored) locally and **Vercel env vars** in
+  production.
