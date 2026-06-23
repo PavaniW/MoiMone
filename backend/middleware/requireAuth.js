@@ -1,39 +1,61 @@
 import { randomBytes } from 'crypto';
 import { supabase } from '../lib/supabase.js';
 
-// First-login setup: create the user's private "Personal" space, make them its
-// owner, and create their profile (with a secret ingest token for the iOS
-// Shortcut). Returns the personal space id. Idempotent enough for our needs —
-// only runs when the user has no profile yet.
-async function bootstrap(user) {
-  const { data: space, error: e1 } = await supabase
-    .from('spaces')
-    .insert({ name: 'Personal', kind: 'personal', created_by: user.id })
-    .select('id')
-    .single();
-  if (e1) throw new Error(`bootstrap space: ${e1.message}`);
+// Ensure the user has a profile + a private "Personal" space, returning its id.
+// Race-safe: the profile row (PK = user id) is claimed first as a per-user lock,
+// so concurrent first-login requests can't create duplicate spaces. The loser of
+// the race just waits for the winner to finish.
+async function ensurePersonalSpace(user) {
+  // Fast path — already set up.
+  const existing = await supabase
+    .from('profiles')
+    .select('personal_space_id')
+    .eq('id', user.id)
+    .maybeSingle();
+  if (existing.data?.personal_space_id) return existing.data.personal_space_id;
 
-  const { error: e2 } = await supabase
-    .from('space_members')
-    .insert({ space_id: space.id, user_id: user.id, role: 'owner' });
-  if (e2) throw new Error(`bootstrap membership: ${e2.message}`);
-
-  const { error: e3 } = await supabase.from('profiles').insert({
+  // Claim the profile row (only one concurrent request can win this insert).
+  const { error: claimErr } = await supabase.from('profiles').insert({
     id: user.id,
     email: user.email,
     display_name: user.user_metadata?.full_name || user.user_metadata?.name || user.email,
-    personal_space_id: space.id,
     ingest_token: randomBytes(24).toString('hex'),
   });
-  if (e3) throw new Error(`bootstrap profile: ${e3.message}`);
 
-  return space.id;
+  if (!claimErr) {
+    // Won the claim — create the personal space, membership, then link it.
+    const { data: space, error: se } = await supabase
+      .from('spaces')
+      .insert({ name: 'Personal', kind: 'personal', created_by: user.id })
+      .select('id')
+      .single();
+    if (se) throw new Error(`bootstrap space: ${se.message}`);
+
+    const { error: me } = await supabase
+      .from('space_members')
+      .upsert({ space_id: space.id, user_id: user.id, role: 'owner' }, { onConflict: 'space_id,user_id' });
+    if (me) throw new Error(`bootstrap member: ${me.message}`);
+
+    await supabase.from('profiles').update({ personal_space_id: space.id }).eq('id', user.id);
+    return space.id;
+  }
+
+  // 23505 = unique violation → another request is mid-bootstrap. Poll for it.
+  if (claimErr.code !== '23505') throw new Error(`bootstrap profile: ${claimErr.message}`);
+  for (let i = 0; i < 15; i++) {
+    await new Promise((r) => setTimeout(r, 120));
+    const { data } = await supabase
+      .from('profiles')
+      .select('personal_space_id')
+      .eq('id', user.id)
+      .maybeSingle();
+    if (data?.personal_space_id) return data.personal_space_id;
+  }
+  throw new Error('account setup is taking too long — please retry');
 }
 
 // Verify the Supabase (Google) session on every API request. On success sets:
-//   req.user            — the Supabase user (id, email, ...)
-//   req.personalSpaceId — their private default ledger
-//   req.spaceIds        — all spaces they can read/write (personal + shared)
+//   req.user, req.personalSpaceId, req.spaceIds (all spaces the user can access)
 export async function requireAuth(req, res, next) {
   try {
     const header = req.headers.authorization || '';
@@ -46,32 +68,18 @@ export async function requireAuth(req, res, next) {
     }
     const user = data.user;
 
-    const { data: profile, error: pErr } = await supabase
-      .from('profiles')
-      .select('personal_space_id')
-      .eq('id', user.id)
-      .maybeSingle();
-    if (pErr) throw new Error(pErr.message);
+    const personalSpaceId = await ensurePersonalSpace(user);
 
-    let personalSpaceId;
-    let spaceIds;
-    if (!profile) {
-      personalSpaceId = await bootstrap(user);
-      spaceIds = [personalSpaceId];
-    } else {
-      personalSpaceId = profile.personal_space_id;
-      const { data: members, error: mErr } = await supabase
-        .from('space_members')
-        .select('space_id')
-        .eq('user_id', user.id);
-      if (mErr) throw new Error(mErr.message);
-      spaceIds = (members || []).map((m) => m.space_id);
-      if (!spaceIds.length) spaceIds = [personalSpaceId];
-    }
+    const { data: members, error: mErr } = await supabase
+      .from('space_members')
+      .select('space_id')
+      .eq('user_id', user.id);
+    if (mErr) throw new Error(mErr.message);
+    const spaceIds = (members || []).map((m) => m.space_id);
 
     req.user = user;
     req.personalSpaceId = personalSpaceId;
-    req.spaceIds = spaceIds;
+    req.spaceIds = spaceIds.length ? spaceIds : [personalSpaceId];
     next();
   } catch (err) {
     next(err);
