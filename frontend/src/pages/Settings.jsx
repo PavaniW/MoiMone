@@ -45,7 +45,7 @@ export default function Settings() {
   }, []);
 
   async function regenerate() {
-    if (!window.confirm('Generate a new token? Your current iOS Shortcut will stop working until you update it with the new token.')) {
+    if (!window.confirm('Generate a new token? You’ll just need to paste the new one into your iOS Shortcut afterwards.')) {
       return;
     }
     setRotating(true);
@@ -107,7 +107,7 @@ export default function Settings() {
         <ol className="setup-steps">
           <li>First, save your bank's SMS sender to <strong>Contacts</strong> (iOS auto-runs message automations more reliably for saved contacts).</li>
           <li>Open the <strong>Shortcuts</strong> app → <strong>Automation</strong> tab → <strong>＋</strong> → <strong>New Personal Automation</strong>.</li>
-          <li>Pick <strong>Message</strong> → <strong>Message Contains</strong> a word always in your bank texts (e.g. your bank's name or <code>LKR</code>) → choose <strong>Run Immediately</strong>.</li>
+          <li>Pick <strong>Message</strong> → <strong>Message Contains</strong> a phrase always in your bank texts (for example: <code>authorised on your</code>) → choose <strong>Run Immediately</strong>.</li>
           <li>Add the action <strong>Get Contents of URL</strong> and tap <strong>Show More</strong>:
             <ul>
               <li><strong>URL</strong>: the Webhook URL above</li>
@@ -127,7 +127,7 @@ export default function Settings() {
           {rotating ? 'Generating…' : 'Regenerate token'}
         </button>
         <span className="setup-note">
-          Use this only if your token leaks — you'll then need to update the token in your Shortcut.
+          Creates a brand-new token. You’ll just paste the new one into your Shortcut afterwards.
         </span>
       </div>
     </section>

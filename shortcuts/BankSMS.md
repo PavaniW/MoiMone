@@ -14,8 +14,8 @@ in. Keep it secret; it can be rotated if ever needed.
 
 ## Build the automation
 1. **Shortcuts app → Automation → ＋ → New Personal Automation**
-2. Trigger: **Message** → **Message Contains** = a word always in your bank texts
-   (e.g. your bank's name, or `LKR`). Choose **Run Immediately**.
+2. Trigger: **Message** → **Message Contains** = a phrase always in your bank texts
+   (for example: `authorised on your`). Choose **Run Immediately**.
 3. Add action **Get Contents of URL**:
    - **URL**: `https://moimone.netlify.app/webhook/sms`
    - **Show More** → **Method**: `POST`
