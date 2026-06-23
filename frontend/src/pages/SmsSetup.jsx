@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
 import Loading from '../components/Loading.jsx';
+import BackLink from '../components/BackLink.jsx';
 
 // One labelled value with a copy button.
 function CopyField({ label, value, mono = true }) {
@@ -72,6 +73,7 @@ export default function SmsSetup() {
 
   return (
     <section>
+      <BackLink />
       <header className="stmt-head">
         <div>
           <div className="stmt-eyebrow">Connect</div>

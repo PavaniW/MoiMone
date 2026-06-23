@@ -71,7 +71,7 @@ export default function Settings() {
         </Link>
         <Link to="/whatsapp" className="settings-row">
           <WhatsAppIcon />
-          <span className="settings-row-label">WhatsApp</span>
+          <span className="settings-row-label">WhatsApp Setup</span>
           <Chevron />
         </Link>
         <button className="settings-row danger" onClick={signOut}>

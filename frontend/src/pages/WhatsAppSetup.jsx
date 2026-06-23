@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
 import Loading, { Spinner } from '../components/Loading.jsx';
+import BackLink from '../components/BackLink.jsx';
 
 // WhatsApp — register the number that maps inbound messages to this account,
 // and explain how to log expenses by texting the bot.
@@ -50,10 +51,11 @@ export default function WhatsAppSetup() {
 
   return (
     <section>
+      <BackLink />
       <header className="stmt-head">
         <div>
           <div className="stmt-eyebrow">Connect</div>
-          <h2 className="stmt-title">WhatsApp</h2>
+          <h2 className="stmt-title">WhatsApp Setup</h2>
         </div>
       </header>
 

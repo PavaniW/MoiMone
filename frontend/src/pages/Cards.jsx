@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
 import Loading, { Spinner } from '../components/Loading.jsx';
+import BackLink from '../components/BackLink.jsx';
 
 const SWATCHES = ['#2f6b4f', '#b0563c', '#45B7D1', '#DDA0DD', '#FFC857', '#4ECDC4'];
 const EMPTY = { nickname: '', bank: '', type: 'credit', last4: '', color: SWATCHES[0] };
@@ -76,6 +77,7 @@ export default function Cards() {
 
   return (
     <section>
+      <BackLink />
       <header className="stmt-head">
         <div>
           <div className="stmt-eyebrow">Wallet</div>

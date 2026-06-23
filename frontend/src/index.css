@@ -1205,6 +1205,26 @@ body {
   }
 }
 
+/* ---------- Breadcrumb / back link ---------- */
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  margin-bottom: 0.95rem;
+  color: var(--muted);
+  text-decoration: none;
+  font-family: var(--mono);
+  font-size: 0.76rem;
+  letter-spacing: 0.06em;
+  transition: color 0.15s;
+}
+.back-link:hover {
+  color: var(--green);
+}
+.back-link svg {
+  margin-left: -3px;
+}
+
 /* ---------- Spinner / loading ---------- */
 .spinner {
   position: relative;
