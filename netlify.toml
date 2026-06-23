@@ -13,7 +13,10 @@
   functions = "backend/netlify/functions"
 
 [build.environment]
-  NODE_VERSION = "20"
+  # Node 22+ has a native global WebSocket, which @supabase/supabase-js's
+  # Realtime client requires. Node 20 throws "Node.js 20 detected without
+  # native WebSocket support" on the first DB call.
+  NODE_VERSION = "22"
 
 [functions]
   node_bundler = "esbuild"
