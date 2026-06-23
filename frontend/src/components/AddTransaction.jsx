@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { api } from '../lib/api.js';
 import { Spinner } from './Loading.jsx';
+import { useSpace } from '../space.jsx';
 
 // Today as yyyy-mm-dd for the date input default.
 function today() {
@@ -8,7 +9,8 @@ function today() {
 }
 
 // Build the form state from an existing transaction (edit) or blank (create).
-function toForm(categories, t) {
+// `defaultSpace` is the space a new entry (or one without a space) belongs to.
+function toForm(categories, t, defaultSpace) {
   if (!t) {
     return {
       type: 'expense',
@@ -18,6 +20,7 @@ function toForm(categories, t) {
       transaction_date: today(),
       description: '',
       paidWith: '',
+      space: defaultSpace || '',
     };
   }
   return {
@@ -33,6 +36,7 @@ function toForm(categories, t) {
       : t.payment_method === 'cash' || t.payment_method === 'other'
         ? t.payment_method
         : '',
+    space: t.space_id || defaultSpace || '',
   };
 }
 
@@ -42,7 +46,10 @@ function toForm(categories, t) {
 // onCancel, when provided, renders a Cancel button (used by the edit modal).
 export default function AddTransaction({ categories = [], cards = [], spaceId = null, initial = null, onCreated, onUpdated, onCancel }) {
   const isEdit = Boolean(initial);
-  const [form, setForm] = useState(() => toForm(categories, initial));
+  const { spaces } = useSpace();
+  const defaultSpace =
+    initial?.space_id || spaceId || spaces.find((s) => s.kind === 'personal')?.id || spaces[0]?.id || '';
+  const [form, setForm] = useState(() => toForm(categories, initial, defaultSpace));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
@@ -81,11 +88,11 @@ export default function AddTransaction({ categories = [], cards = [], spaceId = 
     setSaving(true);
     try {
       if (isEdit) {
-        const updated = await api.updateTransaction(initial.id, payload);
+        const updated = await api.updateTransaction(initial.id, { ...payload, space_id: form.space });
         onUpdated?.(updated);
       } else {
-        const created = await api.createTransaction({ ...payload, space_id: spaceId });
-        setForm(toForm(categories, null));
+        const created = await api.createTransaction({ ...payload, space_id: form.space || spaceId });
+        setForm(toForm(categories, null, defaultSpace));
         onCreated?.(created);
       }
     } catch (err) {
@@ -176,6 +183,20 @@ export default function AddTransaction({ categories = [], cards = [], spaceId = 
             <option value="other">Other</option>
           </select>
         </label>
+
+        {spaces.length > 1 && (
+          <label className="field">
+            <span className="field-label">Space</span>
+            <select className="field-input" value={form.space} onChange={set('space')}>
+              {spaces.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.kind === 'personal' ? '👤 ' : '👥 '}
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
       </div>
 
       {error && <p className="form-error">{error}</p>}
