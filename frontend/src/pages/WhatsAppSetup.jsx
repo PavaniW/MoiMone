@@ -98,11 +98,14 @@ export default function WhatsAppSetup() {
         <div className="panel-head">
           <h3 className="panel-title">How to use it</h3>
         </div>
+        <div className="wa-connect">
+          <strong>Connect once:</strong> on WhatsApp, send <code>join north-gas</code> to{' '}
+          <code>+1 415 523 8886</code> — you’ll get a “you’re all set” reply.
+        </div>
         <ol className="setup-steps">
           <li>Save your WhatsApp number above (with country code, e.g. <code>+9477…</code>).</li>
-          <li>On WhatsApp, send the one-time <strong>join code</strong> to the bot’s number to connect (you’ll get the code + number from whoever set up the bot).</li>
-          <li>Then just message it naturally: <em>“paid 1500 for fuel”</em> or <em>“spent 200 on lunch at KFC”</em>.</li>
-          <li>It logs the transaction to your private account and replies with a confirmation and your remaining budget.</li>
+          <li>Message the bot naturally: <em>“paid 1500 for fuel”</em> or <em>“spent 200 on lunch at KFC”</em>.</li>
+          <li>It logs to your private account and replies with a confirmation + your remaining budget.</li>
         </ol>
       </div>
     </section>
