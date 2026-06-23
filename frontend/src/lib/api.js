@@ -37,6 +37,7 @@ async function request(path, options = {}) {
 export const api = {
   // Current user + their spaces + ingest token
   me: () => request('/api/me'),
+  regenerateIngestToken: () => request('/api/me/ingest-token', { method: 'POST' }),
 
   // Transactions
   getTransactions: (params = '') => request(`/api/transactions${params}`),

@@ -4,6 +4,7 @@ import Transactions from './pages/Transactions.jsx';
 import Budgets from './pages/Budgets.jsx';
 import Goals from './pages/Goals.jsx';
 import Chat from './pages/Chat.jsx';
+import Settings from './pages/Settings.jsx';
 import Login from './pages/Login.jsx';
 import { useAuth } from './auth.jsx';
 import { isSupabaseConfigured } from './lib/supabase.js';
@@ -103,6 +104,12 @@ export default function App() {
         </nav>
         <div className="sidebar-foot">
           <span className="user-email">{user?.email}</span>
+          <NavLink
+            to="/settings"
+            className={({ isActive }) => (isActive ? 'foot-link active' : 'foot-link')}
+          >
+            SMS Setup
+          </NavLink>
           <button className="signout" onClick={signOut}>
             Sign out
           </button>
@@ -116,6 +123,7 @@ export default function App() {
           <Route path="/budgets" element={<Budgets />} />
           <Route path="/goals" element={<Goals />} />
           <Route path="/chat" element={<Chat />} />
+          <Route path="/settings" element={<Settings />} />
         </Routes>
       </main>
 

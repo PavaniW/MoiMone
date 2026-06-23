@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { randomBytes } from 'crypto';
 import { supabase } from '../lib/supabase.js';
 
 const router = Router();
@@ -29,6 +30,22 @@ router.get('/', async (req, res, next) => {
       whatsappNumber: profile.whatsapp_number,
       spaces,
     });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/me/ingest-token — rotate the ingest token (e.g. if it leaked).
+// The old token stops working immediately; the iOS Shortcut must be updated.
+router.post('/ingest-token', async (req, res, next) => {
+  try {
+    const token = randomBytes(24).toString('hex');
+    const { error } = await supabase
+      .from('profiles')
+      .update({ ingest_token: token })
+      .eq('id', req.user.id);
+    if (error) throw new Error(error.message);
+    res.json({ ingestToken: token });
   } catch (err) {
     next(err);
   }
