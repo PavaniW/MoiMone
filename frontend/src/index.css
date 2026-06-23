@@ -10,8 +10,8 @@
   --green: #2f6b4f; /* income / positive / on-track */
   --sienna: #b0563c; /* expense / over-budget alert */
 
-  --display: 'Space Grotesk', system-ui, sans-serif;
-  --mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', monospace;
+  --display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, 'Segoe UI', Roboto, sans-serif;
+  --mono: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, 'Segoe UI', Roboto, sans-serif;
 
   color: var(--ink);
   background: var(--paper);
