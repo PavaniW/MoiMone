@@ -128,7 +128,7 @@ export default function Transactions() {
     <section>
       <header className="stmt-head">
         <div>
-          <div className="stmt-eyebrow">Ledger</div>
+          <div className="stmt-eyebrow">Activity</div>
           <h2 className="stmt-title">Transactions</h2>
         </div>
         <button className="btn-primary" onClick={() => setShowAdd((s) => !s)}>
