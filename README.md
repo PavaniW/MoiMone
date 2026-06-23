@@ -37,6 +37,12 @@ npm run dev               # http://localhost:5173
 
 ## Status
 
-Foundation scaffold (Session 1). All API routes and services are stubbed and
-return `501 Not implemented`; build them out following the implementation order
-in the blueprint.
+Core data flow is live. Implemented:
+- **Transactions** — list/filter, manual add, inline category edit, delete
+- **Budgets** — set monthly limits, progress bars, delete
+- **Goals** — create, add funds, progress + days remaining, delete
+- **Dashboard** — monthly summary, spending chart, budgets, recent entries
+- **Ingestion** — SMS webhook + WhatsApp bot via the Claude/Groq/Ollama parser
+
+Still stubbed (return `501`): `/api/chat` (in-app AI chat) and `/api/gmail/sync`
+(Gmail polling) — build them following the blueprint's implementation order.

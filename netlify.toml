@@ -1,0 +1,39 @@
+# Single-site Netlify config for the finance tracker.
+# Serves the Vite frontend as static files AND runs the Express backend as one
+# serverless function, on the same domain.
+#
+# In the Netlify UI, connect this repo and leave the base directory as the repo
+# ROOT (blank) — do NOT set it to "backend". This file drives everything.
+
+[build]
+  # Build the frontend, then make sure the backend's deps are installed so the
+  # function bundler can find express/supabase/twilio/etc.
+  command = "npm install --prefix frontend && npm run build --prefix frontend && npm install --prefix backend"
+  publish = "frontend/dist"
+  functions = "backend/netlify/functions"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+[functions]
+  node_bundler = "esbuild"
+
+# --- API + webhooks → the Express function ---
+# serverless-http hands the original request path to Express, so it still sees
+# /api/... and /webhook/... and routes them as it does locally.
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api"
+  status = 200
+
+[[redirects]]
+  from = "/webhook/*"
+  to = "/.netlify/functions/api"
+  status = 200
+
+# --- Everything else → the single-page app (client-side routing) ---
+# Non-forced, so real static files (e.g. /assets/*.js) are still served directly.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

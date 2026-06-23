@@ -10,6 +10,8 @@ CREATE TABLE transactions (
   merchant TEXT,
   description TEXT,
   source TEXT NOT NULL CHECK (source IN ('sms', 'email', 'whatsapp', 'manual')),
+  payment_method TEXT CHECK (payment_method IN ('credit', 'debit', 'cash', 'other')),
+  card_last4 TEXT,                  -- last 4 digits of the card, if known
   raw_text TEXT,                    -- original SMS/email text for debugging
   transaction_date TIMESTAMPTZ NOT NULL DEFAULT now(),
   created_at TIMESTAMPTZ DEFAULT now()

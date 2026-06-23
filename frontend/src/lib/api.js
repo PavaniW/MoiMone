@@ -1,5 +1,9 @@
 // Thin wrapper around the backend API.
-const BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+// Default: same-origin in production (the API is a Netlify function on the same
+// domain, reached via /api/*), and the local Express server during dev. Set
+// VITE_API_URL to override — e.g. when the backend is hosted separately.
+const BASE =
+  import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://localhost:3000' : '');
 
 async function request(path, options = {}) {
   const res = await fetch(`${BASE}${path}`, {
@@ -26,12 +30,14 @@ export const api = {
   getBudgets: (params = '') => request(`/api/budgets${params}`),
   upsertBudget: (data) =>
     request('/api/budgets', { method: 'POST', body: JSON.stringify(data) }),
+  deleteBudget: (id) => request(`/api/budgets/${id}`, { method: 'DELETE' }),
 
   // Goals
   getGoals: () => request('/api/goals'),
   createGoal: (data) => request('/api/goals', { method: 'POST', body: JSON.stringify(data) }),
   updateGoal: (id, data) =>
     request(`/api/goals/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteGoal: (id) => request(`/api/goals/${id}`, { method: 'DELETE' }),
 
   // Categories
   getCategories: () => request('/api/categories'),

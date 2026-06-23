@@ -40,14 +40,59 @@ router.get('/', async (req, res, next) => {
   }
 });
 
-// POST /api/budgets — create or update a budget for a category/month
-router.post('/', (_req, res) => {
-  res.status(501).json({ error: 'Not implemented: upsert budget' });
+function badRequest(message) {
+  const err = new Error(message);
+  err.status = 400;
+  return err;
+}
+
+// POST /api/budgets — create or update a budget for a category/month.
+// Body: { category, monthly_limit, month?, year? } (period defaults to current).
+// Upserts on the (category, month, year) unique key.
+router.post('/', async (req, res, next) => {
+  try {
+    const fallback = currentPeriod();
+    const { category, monthly_limit } = req.body || {};
+    const month = Number(req.body?.month) || fallback.month;
+    const year = Number(req.body?.year) || fallback.year;
+
+    if (!category || !String(category).trim()) throw badRequest('category is required');
+    const limit = Number(monthly_limit);
+    if (!(limit > 0)) throw badRequest('monthly_limit must be a positive number');
+    if (month < 1 || month > 12) throw badRequest('month must be 1–12');
+
+    const { data, error } = await supabase
+      .from('budgets')
+      .upsert(
+        { category: String(category).trim(), monthly_limit: limit, month, year },
+        { onConflict: 'category,month,year' }
+      )
+      .select()
+      .single();
+    if (error) throw new Error(error.message);
+
+    res.status(201).json(data);
+  } catch (err) {
+    next(err);
+  }
 });
 
 // DELETE /api/budgets/:id
-router.delete('/:id', (_req, res) => {
-  res.status(501).json({ error: 'Not implemented: delete budget' });
+router.delete('/:id', async (req, res, next) => {
+  try {
+    const { data, error } = await supabase
+      .from('budgets')
+      .delete()
+      .eq('id', req.params.id)
+      .select()
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!data) return res.status(404).json({ error: 'Budget not found' });
+
+    res.json({ deleted: data.id });
+  } catch (err) {
+    next(err);
+  }
 });
 
 export default router;
