@@ -4,6 +4,9 @@ import Transactions from './pages/Transactions.jsx';
 import Budgets from './pages/Budgets.jsx';
 import Goals from './pages/Goals.jsx';
 import Chat from './pages/Chat.jsx';
+import Login from './pages/Login.jsx';
+import { useAuth } from './auth.jsx';
+import { isSupabaseConfigured } from './lib/supabase.js';
 
 // Line icons (stroke = currentColor so they follow active/inactive color).
 const svg = {
@@ -65,6 +68,22 @@ const nav = [
 ];
 
 export default function App() {
+  const { loading, session, user, signOut } = useAuth();
+
+  if (!isSupabaseConfigured) {
+    return (
+      <div className="dash-state">
+        <p className="dash-state-title">Sign-in not configured yet</p>
+        <p className="dash-state-hint">
+          Set <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code> (in
+          <code> frontend/.env</code> locally, or as Netlify env vars) and reload.
+        </p>
+      </div>
+    );
+  }
+  if (loading) return <div className="dash-state">Loading…</div>;
+  if (!session) return <Login />;
+
   return (
     <div className="app">
       <aside className="sidebar">
@@ -82,6 +101,12 @@ export default function App() {
             </NavLink>
           ))}
         </nav>
+        <div className="sidebar-foot">
+          <span className="user-email">{user?.email}</span>
+          <button className="signout" onClick={signOut}>
+            Sign out
+          </button>
+        </div>
       </aside>
 
       <main className="content">

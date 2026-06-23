@@ -47,6 +47,111 @@ body {
   color: #cdd6cd;
   padding: 1.75rem 1.1rem;
   border-right: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Account + sign-out, pinned to the bottom of the sidebar on desktop. */
+.sidebar-foot {
+  margin-top: auto;
+  padding-top: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.user-email {
+  font-size: 0.72rem;
+  color: #8a9b8c;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.signout {
+  font-family: var(--display);
+  background: none;
+  border: 1px solid #2c3b33;
+  color: #cdd6cd;
+  border-radius: 6px;
+  padding: 0.4rem 0.7rem;
+  font-size: 0.82rem;
+  cursor: pointer;
+  text-align: left;
+}
+
+.signout:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+}
+
+/* ---------- Login screen ---------- */
+.login-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--paper);
+  padding: 1.5rem;
+}
+
+.login-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 2.5rem 2rem;
+  width: 100%;
+  max-width: 380px;
+  text-align: center;
+  box-shadow: 0 12px 40px rgba(28, 43, 37, 0.08);
+}
+
+.login-logo {
+  font-size: 1.7rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+
+.login-sub {
+  font-size: 0.66rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--faint);
+  margin: 0.25rem 0 2rem;
+}
+
+.google-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.7rem 1rem;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-family: var(--display);
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.google-btn:hover {
+  background: #f3f5ef;
+}
+
+.google-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.login-fine {
+  font-size: 0.72rem;
+  color: var(--faint);
+  margin: 1.25rem 0 0;
 }
 
 .logo {
@@ -856,16 +961,30 @@ body {
   .app {
     flex-direction: column;
   }
-  /* Sidebar becomes a slim top header showing just the brand. */
+  /* Sidebar becomes a slim top header showing the brand + sign-out. */
   .sidebar {
     width: 100%;
-    display: flex;
+    flex-direction: row;
     align-items: baseline;
     gap: 0.6rem;
     padding: 0.85rem 1.1rem;
   }
   .logo-sub {
     margin: 0;
+  }
+  .sidebar-foot {
+    margin-top: 0;
+    margin-left: auto;
+    padding-top: 0;
+    flex-direction: row;
+    align-items: center;
+  }
+  .user-email {
+    display: none; /* save space on the mobile header */
+  }
+  .signout {
+    padding: 0.3rem 0.55rem;
+    font-size: 0.78rem;
   }
   /* Nav moves to the bottom tab bar on mobile. */
   .sidebar nav {

@@ -1,3 +1,5 @@
+import { supabase } from './supabase.js';
+
 // Thin wrapper around the backend API.
 // Default: same-origin in production (the API is a Netlify function on the same
 // domain, reached via /api/*), and the local Express server during dev. Set
@@ -6,10 +8,25 @@ const BASE =
   import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://localhost:3000' : '');
 
 async function request(path, options = {}) {
+  // Attach the signed-in user's access token so the backend can identify them.
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  const token = session?.access_token;
+
   const res = await fetch(`${BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(options.headers || {}),
+    },
     ...options,
   });
+  if (res.status === 401) {
+    // Session missing/expired — drop it so the app shows the login screen.
+    await supabase.auth.signOut();
+    throw new Error('Your session expired — please sign in again.');
+  }
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.error || `Request failed: ${res.status}`);
@@ -18,6 +35,9 @@ async function request(path, options = {}) {
 }
 
 export const api = {
+  // Current user + their spaces + ingest token
+  me: () => request('/api/me'),
+
   // Transactions
   getTransactions: (params = '') => request(`/api/transactions${params}`),
   createTransaction: (data) =>
