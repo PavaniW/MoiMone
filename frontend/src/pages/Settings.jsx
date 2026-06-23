@@ -21,6 +21,12 @@ const SmsIcon = () => (
     <path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 9 9 0 0 1-3.8-.9L3 21l1.3-4A8.4 8.4 0 0 1 3.6 8 8.5 8.5 0 0 1 12 3.5h.5A8.5 8.5 0 0 1 21 11.5z" />
   </svg>
 );
+const WhatsAppIcon = () => (
+  <svg {...svgProps}>
+    <path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 9 9 0 0 1-3.8-.9L3 21l1.3-4A8.4 8.4 0 0 1 3.6 8 8.5 8.5 0 0 1 12 3.5h.5A8.5 8.5 0 0 1 21 11.5z" />
+    <path d="M8.5 9.5c0 3 2 5 5 5" />
+  </svg>
+);
 const SignOutIcon = () => (
   <svg {...svgProps}>
     <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
@@ -61,6 +67,11 @@ export default function Settings() {
         <Link to="/sms-setup" className="settings-row">
           <SmsIcon />
           <span className="settings-row-label">SMS Setup</span>
+          <Chevron />
+        </Link>
+        <Link to="/whatsapp" className="settings-row">
+          <WhatsAppIcon />
+          <span className="settings-row-label">WhatsApp</span>
           <Chevron />
         </Link>
         <button className="settings-row danger" onClick={signOut}>

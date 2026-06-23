@@ -35,6 +35,36 @@ router.get('/', async (req, res, next) => {
   }
 });
 
+// Keep digits and a leading +, so it matches Twilio's "whatsapp:+9477..." sender.
+function normalizePhone(value) {
+  const s = String(value ?? '').replace(/[^\d+]/g, '');
+  if (!s) return null;
+  return s.startsWith('+') ? s : `+${s}`;
+}
+
+// PUT /api/me/whatsapp — register (or clear) the WhatsApp number that maps
+// inbound messages to this account. Body: { number }.
+router.put('/whatsapp', async (req, res, next) => {
+  try {
+    const number = normalizePhone(req.body?.number);
+    const { error } = await supabase
+      .from('profiles')
+      .update({ whatsapp_number: number })
+      .eq('id', req.user.id);
+    if (error) {
+      if (error.code === '23505') {
+        const e = new Error('That number is already linked to another account.');
+        e.status = 400;
+        throw e;
+      }
+      throw new Error(error.message);
+    }
+    res.json({ whatsappNumber: number });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // POST /api/me/ingest-token — rotate the ingest token (e.g. if it leaked).
 // The old token stops working immediately; the iOS Shortcut must be updated.
 router.post('/ingest-token', async (req, res, next) => {

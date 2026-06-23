@@ -7,6 +7,7 @@ import Chat from './pages/Chat.jsx';
 import Cards from './pages/Cards.jsx';
 import Settings from './pages/Settings.jsx';
 import SmsSetup from './pages/SmsSetup.jsx';
+import WhatsAppSetup from './pages/WhatsAppSetup.jsx';
 import Login from './pages/Login.jsx';
 import { useAuth } from './auth.jsx';
 import { isSupabaseConfigured } from './lib/supabase.js';
@@ -137,6 +138,7 @@ export default function App() {
           <Route path="/cards" element={<Cards />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/sms-setup" element={<SmsSetup />} />
+          <Route path="/whatsapp" element={<WhatsAppSetup />} />
         </Routes>
       </main>
 

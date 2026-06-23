@@ -38,6 +38,8 @@ export const api = {
   // Current user + their spaces + ingest token
   me: () => request('/api/me'),
   regenerateIngestToken: () => request('/api/me/ingest-token', { method: 'POST' }),
+  updateWhatsApp: (number) =>
+    request('/api/me/whatsapp', { method: 'PUT', body: JSON.stringify({ number }) }),
 
   // Transactions
   getTransactions: (params = '') => request(`/api/transactions${params}`),
