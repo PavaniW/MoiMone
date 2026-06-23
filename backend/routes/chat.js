@@ -31,7 +31,7 @@ function summarize(rows) {
 // month and last month (per-category totals), current-month budgets with spend,
 // savings goals, and a capped list of recent transactions for merchant-level
 // questions. Everything is scoped to the spaces this user belongs to.
-async function buildContext(req) {
+async function buildContext(req, spaceIds) {
   const { month, year } = currentPeriod();
   const prevMonth = month === 1 ? 12 : month - 1;
   const prevYear = month === 1 ? year - 1 : year;
@@ -42,7 +42,7 @@ async function buildContext(req) {
   const { data: txns, error: txErr } = await supabase
     .from('transactions')
     .select('amount, type, category, merchant, payment_method, transaction_date')
-    .in('space_id', req.spaceIds)
+    .in('space_id', spaceIds)
     .gte('transaction_date', prevRange.start)
     .order('transaction_date', { ascending: false });
   if (txErr) throw new Error(txErr.message);
@@ -57,7 +57,7 @@ async function buildContext(req) {
   const { data: budgetRows, error: bErr } = await supabase
     .from('budgets')
     .select('category, monthly_limit')
-    .in('space_id', req.spaceIds)
+    .in('space_id', spaceIds)
     .eq('month', month)
     .eq('year', year);
   if (bErr) throw new Error(bErr.message);
@@ -71,7 +71,7 @@ async function buildContext(req) {
   const { data: goalRows, error: gErr } = await supabase
     .from('goals')
     .select('name, target_amount, current_amount, deadline')
-    .in('space_id', req.spaceIds);
+    .in('space_id', spaceIds);
   if (gErr) throw new Error(gErr.message);
   const goals = (goalRows || []).map((g) => ({
     name: g.name,
@@ -112,7 +112,10 @@ router.post('/', async (req, res, next) => {
       err.status = 400;
       throw err;
     }
-    const context = await buildContext(req);
+    // Scope to the space the user is viewing, if they belong to it; else all.
+    const requested = req.body?.space;
+    const spaceIds = requested && req.spaceIds.includes(requested) ? [requested] : req.spaceIds;
+    const context = await buildContext(req, spaceIds);
     const answer = await answerFinanceQuestion(message, context);
     res.json({ answer });
   } catch (err) {

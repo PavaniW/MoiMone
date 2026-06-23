@@ -110,7 +110,12 @@ export default function Transactions() {
   }
 
   function handleUpdated(txn) {
-    setRows((rs) => rs.map((t) => (t.id === txn.id ? txn : t)));
+    // If it was moved to a different space, drop it from this (scoped) view.
+    setRows((rs) =>
+      txn.space_id && txn.space_id !== currentSpaceId
+        ? rs.filter((t) => t.id !== txn.id)
+        : rs.map((t) => (t.id === txn.id ? txn : t))
+    );
     setEditing(null);
   }
 

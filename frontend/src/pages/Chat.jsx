@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api.js';
+import { useSpace } from '../space.jsx';
 
 // Page 5 — Chat: ask questions about your spending in plain language.
 // Posts to /api/chat, which summarizes your data and answers via the LLM.
@@ -20,6 +21,7 @@ export default function Chat() {
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const scrollRef = useRef(null);
+  const { currentSpaceId } = useSpace();
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -33,7 +35,7 @@ export default function Chat() {
     setMessages((m) => [...m, { role: 'user', text: question }]);
     setSending(true);
     try {
-      const { answer } = await api.chat(question);
+      const { answer } = await api.chat(question, currentSpaceId);
       setMessages((m) => [...m, { role: 'assistant', text: answer }]);
     } catch (err) {
       setMessages((m) => [

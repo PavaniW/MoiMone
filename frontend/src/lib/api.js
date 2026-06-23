@@ -85,5 +85,6 @@ export const api = {
   deleteCategory: (id) => request(`/api/categories/${id}`, { method: 'DELETE' }),
 
   // Chat
-  chat: (message) => request('/api/chat', { method: 'POST', body: JSON.stringify({ message }) }),
+  chat: (message, space) =>
+    request('/api/chat', { method: 'POST', body: JSON.stringify({ message, space }) }),
 };

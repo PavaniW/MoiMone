@@ -85,6 +85,17 @@ router.post('/:id/members', async (req, res, next) => {
     const spaceId = req.params.id;
     if (!req.spaceIds.includes(spaceId)) throw badRequest('not your space');
 
+    // Only the owner can add members (matches the UI).
+    const { data: space, error: spErr } = await supabase
+      .from('spaces')
+      .select('created_by')
+      .eq('id', spaceId)
+      .maybeSingle();
+    if (spErr) throw new Error(spErr.message);
+    if (!space || space.created_by !== req.user.id) {
+      throw badRequest('only the owner can add members');
+    }
+
     const email = String(req.body?.email || '').trim();
     if (!email) throw badRequest('email is required');
 
@@ -136,6 +147,17 @@ router.delete('/:id/members/:userId', async (req, res, next) => {
     const target = req.params.userId;
     const isOwner = space.created_by === req.user.id;
     if (target !== req.user.id && !isOwner) throw badRequest('only the owner can remove other members');
+
+    // The owner can't abandon a space that still has other members (would orphan it).
+    if (target === req.user.id && isOwner) {
+      const { count } = await supabase
+        .from('space_members')
+        .select('*', { count: 'exact', head: true })
+        .eq('space_id', spaceId);
+      if ((count || 0) > 1) {
+        throw badRequest('You own this space — remove the other members before leaving.');
+      }
+    }
 
     const { error } = await supabase
       .from('space_members')
