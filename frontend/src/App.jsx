@@ -17,7 +17,7 @@ export default function App() {
   return (
     <div className="app">
       <aside className="sidebar">
-        <h1 className="logo">Ledger</h1>
+        <h1 className="logo">MoiMone</h1>
         <p className="logo-sub">Personal Finance</p>
         <nav>
           {nav.map((item) => (
