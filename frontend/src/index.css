@@ -566,9 +566,67 @@ body {
 /* ---------- Filters ---------- */
 .filters {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr;
+  grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
   gap: 0.7rem;
   margin-top: 1.25rem;
+}
+
+/* ---------- Card (payment instrument) ---------- */
+.merchant-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.card-tag {
+  font-family: var(--mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.02em;
+  color: var(--faint);
+}
+
+.card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.card-row {
+  display: grid;
+  grid-template-columns: 120px 1fr 120px;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.card-row-label {
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.card-row-track {
+  height: 8px;
+  background: var(--bar);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.card-row-fill {
+  height: 100%;
+  background: var(--green);
+  border-radius: 2px;
+}
+
+.card-row-amount {
+  font-size: 0.82rem;
+  text-align: right;
+  color: var(--ink);
+}
+
+.card-row-amount .sym {
+  color: var(--faint);
+  font-size: 0.7rem;
+  margin-right: 0.25rem;
 }
 
 /* ---------- Editable ledger rows ---------- */
@@ -752,6 +810,10 @@ body {
   }
   .field-grid {
     grid-template-columns: 1fr;
+  }
+  .card-row {
+    grid-template-columns: 90px 1fr 92px;
+    gap: 0.5rem;
   }
 }
 

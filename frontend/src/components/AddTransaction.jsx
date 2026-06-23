@@ -13,6 +13,8 @@ const EMPTY = (categories) => ({
   category: categories[0]?.name || 'Other',
   transaction_date: today(),
   description: '',
+  payment_method: '',
+  card_last4: '',
 });
 
 // Manual transaction entry form. Posts to /api/transactions and hands the saved
@@ -42,6 +44,8 @@ export default function AddTransaction({ categories = [], onCreated }) {
         category: form.category,
         transaction_date: form.transaction_date,
         description: form.description.trim() || null,
+        payment_method: form.payment_method || null,
+        card_last4: form.card_last4.trim() || null,
       });
       setForm(EMPTY(categories));
       onCreated?.(created);
@@ -116,6 +120,31 @@ export default function AddTransaction({ categories = [], onCreated }) {
             type="date"
             value={form.transaction_date}
             onChange={set('transaction_date')}
+          />
+        </label>
+
+        <label className="field">
+          <span className="field-label">Paid with</span>
+          <select className="field-input" value={form.payment_method} onChange={set('payment_method')}>
+            <option value="">—</option>
+            <option value="credit">Credit card</option>
+            <option value="debit">Debit card</option>
+            <option value="cash">Cash</option>
+            <option value="other">Other</option>
+          </select>
+        </label>
+
+        <label className="field">
+          <span className="field-label">Card last 4</span>
+          <input
+            className="field-input num"
+            type="text"
+            inputMode="numeric"
+            maxLength={4}
+            value={form.card_last4}
+            onChange={set('card_last4')}
+            placeholder="4521"
+            disabled={form.payment_method !== 'credit' && form.payment_method !== 'debit'}
           />
         </label>
       </div>

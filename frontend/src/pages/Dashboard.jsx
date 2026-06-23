@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import SpendingChart from '../components/SpendingChart.jsx';
 import BudgetBar from '../components/BudgetBar.jsx';
 import TransactionItem from '../components/TransactionItem.jsx';
-import { formatAmount, CURRENCY } from '../lib/format.js';
+import { formatAmount, formatCard, cardKey, CURRENCY } from '../lib/format.js';
 import { api } from '../lib/api.js';
 
 const now = new Date();
@@ -22,6 +22,7 @@ function build(categories, monthTxns, recentTxns, budgetRows) {
   let spent = 0;
   let income = 0;
   const byCategory = {};
+  const byCardMap = {};
   for (const t of monthTxns) {
     const amount = Number(t.amount);
     if (t.type === 'income') {
@@ -29,8 +30,15 @@ function build(categories, monthTxns, recentTxns, budgetRows) {
     } else {
       spent += amount;
       byCategory[t.category] = (byCategory[t.category] || 0) + amount;
+
+      const key = cardKey(t.payment_method, t.card_last4);
+      const label = t.payment_method ? formatCard(t.payment_method, t.card_last4) : 'Unspecified';
+      if (!byCardMap[key]) byCardMap[key] = { key, label, amount: 0 };
+      byCardMap[key].amount += amount;
     }
   }
+
+  const byCard = Object.values(byCardMap).sort((a, b) => b.amount - a.amount);
 
   const spendByCategory = Object.entries(byCategory)
     .map(([category, amount]) => ({ category, amount, color: colorOf[category] || FALLBACK_COLOR }))
@@ -49,7 +57,7 @@ function build(categories, monthTxns, recentTxns, budgetRows) {
     color: colorOf[t.category] || FALLBACK_COLOR,
   }));
 
-  return { summary: { spent, income, net: income - spent }, spendByCategory, budgets, recent };
+  return { summary: { spent, income, net: income - spent }, spendByCategory, budgets, recent, byCard };
 }
 
 // Page 1 — Dashboard, styled as a personal statement. Live data via the backend API.
@@ -92,7 +100,8 @@ export default function Dashboard() {
     );
   }
 
-  const { summary, spendByCategory, budgets, recent } = state.data;
+  const { summary, spendByCategory, budgets, recent, byCard } = state.data;
+  const cardMax = byCard.reduce((m, c) => Math.max(m, c.amount), 0);
 
   return (
     <section>
@@ -159,6 +168,35 @@ export default function Dashboard() {
             <p className="panel-empty">No budgets set for this month.</p>
           )}
         </div>
+      </div>
+
+      {/* Spending by card */}
+      <div className="panel" style={{ marginTop: '1.5rem' }}>
+        <div className="panel-head">
+          <h3 className="panel-title">By Card</h3>
+          <span className="panel-note">credit vs debit</span>
+        </div>
+        {byCard.length ? (
+          <div className="card-list">
+            {byCard.map((c) => (
+              <div className="card-row" key={c.key}>
+                <span className="card-row-label">{c.label}</span>
+                <div className="card-row-track">
+                  <div
+                    className="card-row-fill"
+                    style={{ width: `${cardMax ? (c.amount / cardMax) * 100 : 0}%` }}
+                  />
+                </div>
+                <span className="card-row-amount num">
+                  <span className="sym">{CURRENCY}</span>
+                  {formatAmount(c.amount)}
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="panel-empty">No card spending recorded this month yet.</p>
+        )}
       </div>
 
       {/* Recent transactions ledger */}

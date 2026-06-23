@@ -16,6 +16,9 @@ const CLAUDE_MODEL = 'claude-sonnet-4-6';
 // Default currency for amounts that arrive without an explicit code.
 export const DEFAULT_CURRENCY = 'LKR';
 
+// Must stay in sync with the transactions.payment_method CHECK in schema.sql.
+export const PAYMENT_METHODS = ['credit', 'debit', 'cash', 'other'];
+
 // Must stay in sync with the `categories` table seed in supabase/schema.sql.
 export const CATEGORIES = [
   'Food & Dining',
@@ -37,9 +40,18 @@ const TRANSACTION_SCHEMA = {
     merchant: { type: 'string', description: 'Merchant or payee name; "Unknown" if not stated' },
     type: { type: 'string', enum: ['expense', 'income'] },
     category: { type: 'string', enum: CATEGORIES },
+    payment_method: {
+      type: 'string',
+      enum: ['credit', 'debit', 'cash', 'other'],
+      description: 'Which instrument paid: credit card, debit card, cash, or other',
+    },
+    card_last4: {
+      type: 'string',
+      description: 'Last 4 digits of the card if stated, otherwise an empty string',
+    },
     confidence: { type: 'number', description: 'Confidence in the extraction from 0 to 1' },
   },
-  required: ['amount', 'currency', 'merchant', 'type', 'category', 'confidence'],
+  required: ['amount', 'currency', 'merchant', 'type', 'category', 'payment_method', 'card_last4', 'confidence'],
 };
 
 const SYSTEM_PROMPT = `You are a financial transaction parser. Extract structured data from a single bank SMS, WhatsApp message, or email notification.
@@ -50,6 +62,8 @@ Rules:
 - merchant: the merchant or payee name. If none is stated, use "Unknown".
 - type: "income" for money received (salary, refund, deposit, credit); "expense" for money spent (purchase, payment, withdrawal, debit, charge).
 - category: choose the single best fit from the allowed list. Use "Salary" only for clear salary/payroll income. Use "Other" when nothing fits.
+- payment_method: "credit" if a credit card was used; "debit" for a debit card or a direct account/current/savings debit; "cash" for cash; otherwise "other".
+- card_last4: the last 4 digits of the card or account if the message states them (e.g. "card ending 4521"), otherwise an empty string.
 - confidence: your confidence in the overall extraction, from 0 to 1.
 
 Return only the structured object — no commentary.`;
@@ -61,9 +75,12 @@ function normalize(p) {
   const category = CATEGORIES.includes(p?.category) ? p.category : 'Other';
   const merchant = (p?.merchant && String(p.merchant).trim()) || 'Unknown';
   const currency = (p?.currency && String(p.currency).trim()) || DEFAULT_CURRENCY;
+  const payment_method = PAYMENT_METHODS.includes(p?.payment_method) ? p.payment_method : 'other';
+  const digits = String(p?.card_last4 ?? '').replace(/\D/g, '');
+  const card_last4 = digits.length === 4 ? digits : null;
   let confidence = Number(p?.confidence);
   if (!(confidence >= 0 && confidence <= 1)) confidence = 0.5;
-  return { amount, currency, merchant, type, category, confidence };
+  return { amount, currency, merchant, type, category, payment_method, card_last4, confidence };
 }
 
 function chooseProvider() {
@@ -98,7 +115,7 @@ async function parseWithGroq(rawText) {
   if (!apiKey) throw new Error('GROQ_API_KEY is not set');
   const model = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
 
-  const jsonInstruction = `Return a JSON object with exactly these keys: amount (number), currency (string), merchant (string), type ("expense" or "income"), category (one of: ${CATEGORIES.join(', ')}), confidence (number 0-1).`;
+  const jsonInstruction = `Return a JSON object with exactly these keys: amount (number), currency (string), merchant (string), type ("expense" or "income"), category (one of: ${CATEGORIES.join(', ')}), payment_method (one of: credit, debit, cash, other), card_last4 (string: the card's last 4 digits, or "" if not stated), confidence (number 0-1).`;
 
   let res;
   try {
@@ -166,7 +183,7 @@ async function parseWithOllama(rawText) {
 /**
  * Parse a raw message into a structured transaction.
  * @param {string} rawText
- * @returns {Promise<{amount:number,currency:string,merchant:string,type:'expense'|'income',category:string,confidence:number}>}
+ * @returns {Promise<{amount:number,currency:string,merchant:string,type:'expense'|'income',category:string,payment_method:'credit'|'debit'|'cash'|'other',card_last4:string|null,confidence:number}>}
  */
 export async function parseTransaction(rawText) {
   if (!rawText || !rawText.trim()) {

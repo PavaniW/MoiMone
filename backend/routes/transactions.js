@@ -1,8 +1,15 @@
 import { Router } from 'express';
 import { supabase } from '../lib/supabase.js';
 import { monthRange } from '../lib/period.js';
+import { PAYMENT_METHODS } from '../services/parser.js';
 
 const router = Router();
+
+// Normalize a card field to exactly 4 digits, or null.
+function cleanLast4(value) {
+  const digits = String(value ?? '').replace(/\D/g, '');
+  return digits.length === 4 ? digits : null;
+}
 
 // GET /api/transactions — list transactions, newest first.
 // Optional query: ?month=&year= (calendar-month filter), ?limit=, ?category=,
@@ -45,7 +52,8 @@ function badRequest(message) {
 // Body: { amount, type, category, merchant?, description?, transaction_date? }.
 router.post('/', async (req, res, next) => {
   try {
-    const { amount, type, category, merchant, description, transaction_date } = req.body || {};
+    const { amount, type, category, merchant, description, transaction_date, payment_method, card_last4 } =
+      req.body || {};
 
     const value = Math.abs(Number(amount));
     if (!value) throw badRequest('amount must be a non-zero number');
@@ -53,6 +61,9 @@ router.post('/', async (req, res, next) => {
       throw badRequest("type must be 'expense' or 'income'");
     }
     if (!category || !String(category).trim()) throw badRequest('category is required');
+    if (payment_method != null && payment_method !== '' && !PAYMENT_METHODS.includes(payment_method)) {
+      throw badRequest(`payment_method must be one of: ${PAYMENT_METHODS.join(', ')}`);
+    }
 
     const row = {
       amount: value,
@@ -60,6 +71,8 @@ router.post('/', async (req, res, next) => {
       category: String(category).trim(),
       merchant: merchant ? String(merchant).trim() : null,
       description: description ? String(description).trim() : null,
+      payment_method: payment_method || null,
+      card_last4: cleanLast4(card_last4),
       source: 'manual',
     };
     if (transaction_date) row.transaction_date = new Date(transaction_date).toISOString();
@@ -77,7 +90,8 @@ router.post('/', async (req, res, next) => {
 // Only the provided fields are changed.
 router.put('/:id', async (req, res, next) => {
   try {
-    const { amount, type, category, merchant, description, transaction_date } = req.body || {};
+    const { amount, type, category, merchant, description, transaction_date, payment_method, card_last4 } =
+      req.body || {};
     const updates = {};
 
     if (amount !== undefined) {
@@ -102,6 +116,13 @@ router.put('/:id', async (req, res, next) => {
     if (transaction_date !== undefined) {
       updates.transaction_date = new Date(transaction_date).toISOString();
     }
+    if (payment_method !== undefined) {
+      if (payment_method != null && payment_method !== '' && !PAYMENT_METHODS.includes(payment_method)) {
+        throw badRequest(`payment_method must be one of: ${PAYMENT_METHODS.join(', ')}`);
+      }
+      updates.payment_method = payment_method || null;
+    }
+    if (card_last4 !== undefined) updates.card_last4 = cleanLast4(card_last4);
 
     if (!Object.keys(updates).length) throw badRequest('no fields to update');
 

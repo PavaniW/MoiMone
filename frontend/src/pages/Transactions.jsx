@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import AddTransaction from '../components/AddTransaction.jsx';
-import { formatAmount, formatDay, CURRENCY } from '../lib/format.js';
+import { formatAmount, formatDay, formatCard, cardKey, CURRENCY } from '../lib/format.js';
 import { api } from '../lib/api.js';
 
 const FALLBACK_COLOR = '#9A9384';
@@ -18,6 +18,7 @@ export default function Transactions() {
   const [category, setCategory] = useState('');
   const [source, setSource] = useState('');
   const [type, setType] = useState('');
+  const [card, setCard] = useState('');
 
   useEffect(() => {
     let active = true;
@@ -46,19 +47,31 @@ export default function Transactions() {
     [categories]
   );
 
+  // Distinct cards/methods present in the data, for the filter dropdown.
+  const cards = useMemo(() => {
+    const map = new Map();
+    for (const t of rows) {
+      if (!t.payment_method) continue;
+      const key = cardKey(t.payment_method, t.card_last4);
+      if (!map.has(key)) map.set(key, formatCard(t.payment_method, t.card_last4));
+    }
+    return [...map.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+  }, [rows]);
+
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return rows.filter((t) => {
       if (category && t.category !== category) return false;
       if (source && t.source !== source) return false;
       if (type && t.type !== type) return false;
+      if (card && cardKey(t.payment_method, t.card_last4) !== card) return false;
       if (needle) {
         const hay = `${t.merchant || ''} ${t.description || ''} ${t.category}`.toLowerCase();
         if (!hay.includes(needle)) return false;
       }
       return true;
     });
-  }, [rows, q, category, source, type]);
+  }, [rows, q, category, source, type, card]);
 
   const total = useMemo(
     () =>
@@ -152,6 +165,14 @@ export default function Transactions() {
             </option>
           ))}
         </select>
+        <select className="field-input" value={card} onChange={(e) => setCard(e.target.value)}>
+          <option value="">All cards</option>
+          {cards.map(([key, label]) => (
+            <option key={key} value={key}>
+              {label}
+            </option>
+          ))}
+        </select>
       </div>
 
       {error && <p className="form-error">{error}</p>}
@@ -186,7 +207,12 @@ export default function Transactions() {
                       className="cat-dot"
                       style={{ background: colorOf[t.category] || FALLBACK_COLOR }}
                     />
-                    {t.merchant || '—'}
+                    <span className="merchant-text">
+                      {t.merchant || '—'}
+                      {t.payment_method && (
+                        <span className="card-tag">{formatCard(t.payment_method, t.card_last4)}</span>
+                      )}
+                    </span>
                   </span>
                   <span className="hide-sm">
                     <select

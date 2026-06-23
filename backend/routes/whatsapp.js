@@ -88,6 +88,8 @@ router.post('/whatsapp', authenticate, async (req, res) => {
       type: parsed.type,
       category: parsed.category,
       merchant: parsed.merchant,
+      payment_method: parsed.payment_method,
+      card_last4: parsed.card_last4,
       source: 'whatsapp',
       raw_text: body,
     });

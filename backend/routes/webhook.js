@@ -24,6 +24,8 @@ router.post('/sms', verifyWebhookToken, async (req, res, next) => {
         type: parsed.type,
         category: parsed.category,
         merchant: parsed.merchant,
+        payment_method: parsed.payment_method,
+        card_last4: parsed.card_last4,
         source: 'sms',
         raw_text: text,
       })
