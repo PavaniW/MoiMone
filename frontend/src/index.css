@@ -2094,3 +2094,16 @@ body {
 .ledger-amount.transfer {
   color: var(--muted);
 }
+
+/* Goal card: edit + delete actions, and the inline edit form */
+.goal-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.goal-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}

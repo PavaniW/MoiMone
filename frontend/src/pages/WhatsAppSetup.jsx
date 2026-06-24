@@ -130,8 +130,11 @@ export default function WhatsAppSetup() {
             <span className="wa-cmd-desc">Foreign currency is auto-converted to LKR.</span>
           </li>
           <li>
-            <span className="wa-cmd-eg"><code>summary</code></span>
-            <span className="wa-cmd-desc">Get this week’s total spend + top category. (Also <code>week</code> / <code>report</code>.)</span>
+            <span className="wa-cmd-eg">“summary”</span>
+            <span className="wa-cmd-desc">
+              Text this word and the bot replies with your spending for the last 7 days + top
+              category. The words “week” and “report” do the same thing.
+            </span>
           </li>
         </ul>
       </div>

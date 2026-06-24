@@ -10,10 +10,13 @@ function daysLeft(deadline) {
   return Math.ceil(ms / 86400000);
 }
 
-// Card for one saving goal: progress bar, % saved, days remaining, add-funds & delete.
-export default function GoalCard({ goal, onAddFunds, onDelete }) {
+// Card for one saving goal: progress bar, % saved, days remaining, add-funds,
+// edit (name/target/deadline) & delete.
+export default function GoalCard({ goal, onAddFunds, onEdit, onDelete }) {
   const [amount, setAmount] = useState('');
   const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState({ name: '', target_amount: '', deadline: '' });
 
   const target = Number(goal.target_amount);
   const current = Number(goal.current_amount);
@@ -35,6 +38,31 @@ export default function GoalCard({ goal, onAddFunds, onDelete }) {
     }
   }
 
+  function startEdit() {
+    setDraft({
+      name: goal.name,
+      target_amount: String(target),
+      deadline: goal.deadline || '',
+    });
+    setEditing(true);
+  }
+
+  async function saveEdit(e) {
+    e.preventDefault();
+    if (!draft.name.trim() || !(Number(draft.target_amount) > 0)) return;
+    setBusy(true);
+    try {
+      await onEdit(goal.id, {
+        name: draft.name.trim(),
+        target_amount: Number(draft.target_amount),
+        deadline: draft.deadline || null,
+      });
+      setEditing(false);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="goal-card">
       <div className="goal-head">
@@ -42,45 +70,92 @@ export default function GoalCard({ goal, onAddFunds, onDelete }) {
           <span className="cat-dot" style={{ background: color }} />
           {goal.name}
         </span>
-        <button className="row-del" title="Delete goal" onClick={() => onDelete(goal.id)}>
-          ✕
-        </button>
-      </div>
-
-      <div className="goal-figures num">
-        <span className="goal-current">
-          {CURRENCY} {formatAmount(current)}
+        <span className="goal-actions">
+          <button className="row-edit" title="Edit goal" onClick={startEdit}>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 20h9" />
+              <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z" />
+            </svg>
+          </button>
+          <button className="row-del" title="Delete goal" onClick={() => onDelete(goal.id)}>
+            ✕
+          </button>
         </span>
-        <span className="goal-target"> / {formatAmount(target)}</span>
       </div>
 
-      <div className="track">
-        <div className="fill" style={{ width: `${pct}%`, background: color }} />
-      </div>
+      {editing ? (
+        <form className="goal-edit" onSubmit={saveEdit}>
+          <input
+            className="field-input"
+            value={draft.name}
+            onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
+            placeholder="Goal name"
+            maxLength={60}
+          />
+          <input
+            className="field-input num"
+            type="number"
+            step="0.01"
+            min="0"
+            value={draft.target_amount}
+            onChange={(e) => setDraft((d) => ({ ...d, target_amount: e.target.value }))}
+            placeholder="Target amount"
+          />
+          <input
+            className="field-input"
+            type="date"
+            value={draft.deadline || ''}
+            onChange={(e) => setDraft((d) => ({ ...d, deadline: e.target.value }))}
+          />
+          <div className="form-actions">
+            <button className="btn-secondary btn-sm" type="button" onClick={() => setEditing(false)}>
+              Cancel
+            </button>
+            <button className="btn-primary btn-sm" type="submit" disabled={busy}>
+              {busy ? '…' : 'Save'}
+            </button>
+          </div>
+        </form>
+      ) : (
+        <>
+          <div className="goal-figures num">
+            <span className="goal-current">
+              {CURRENCY} {formatAmount(current)}
+            </span>
+            <span className="goal-target"> / {formatAmount(target)}</span>
+          </div>
 
-      <div className="goal-meta">
-        <span className={reached ? 'pct alert-pos' : 'pct'}>{reached ? 'Reached 🎉' : `${pct}%`}</span>
-        {days !== null && (
-          <span className="goal-days">
-            {days >= 0 ? `${days} days left` : `${Math.abs(days)} days overdue`}
-          </span>
-        )}
-      </div>
+          <div className="track">
+            <div className="fill" style={{ width: `${pct}%`, background: color }} />
+          </div>
 
-      <form className="goal-add" onSubmit={add}>
-        <input
-          className="field-input num"
-          type="number"
-          step="0.01"
-          min="0"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          placeholder="Add funds"
-        />
-        <button className="btn-secondary" type="submit" disabled={busy}>
-          {busy ? '…' : 'Add'}
-        </button>
-      </form>
+          <div className="goal-meta">
+            <span className={reached ? 'pct alert-pos' : 'pct'}>
+              {reached ? 'Reached 🎉' : `${pct}%`}
+            </span>
+            {days !== null && (
+              <span className="goal-days">
+                {days >= 0 ? `${days} days left` : `${Math.abs(days)} days overdue`}
+              </span>
+            )}
+          </div>
+
+          <form className="goal-add" onSubmit={add}>
+            <input
+              className="field-input num"
+              type="number"
+              step="0.01"
+              min="0"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="Add funds"
+            />
+            <button className="btn-secondary" type="submit" disabled={busy}>
+              {busy ? '…' : 'Add'}
+            </button>
+          </form>
+        </>
+      )}
     </div>
   );
 }

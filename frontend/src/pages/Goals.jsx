@@ -75,6 +75,11 @@ export default function Goals() {
     setGoals((g) => g.map((x) => (x.id === id ? updated : x)));
   }
 
+  async function editGoal(id, patch) {
+    const updated = await api.updateGoal(id, patch);
+    setGoals((g) => g.map((x) => (x.id === id ? updated : x)));
+  }
+
   async function remove(id) {
     if (!window.confirm('Delete this goal?')) return;
     const prev = goals;
@@ -172,7 +177,7 @@ export default function Goals() {
       {goals.length ? (
         <div className="goal-grid">
           {goals.map((g) => (
-            <GoalCard key={g.id} goal={g} onAddFunds={addFunds} onDelete={remove} />
+            <GoalCard key={g.id} goal={g} onAddFunds={addFunds} onEdit={editGoal} onDelete={remove} />
           ))}
         </div>
       ) : (
