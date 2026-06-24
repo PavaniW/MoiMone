@@ -34,6 +34,19 @@ export default function Transactions() {
   const [source, setSource] = useState('');
   const [type, setType] = useState('');
   const [card, setCard] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+
+  const hasFilters = Boolean(q || category || source || type || card || dateFrom || dateTo);
+  function resetFilters() {
+    setQ('');
+    setCategory('');
+    setSource('');
+    setType('');
+    setCard('');
+    setDateFrom('');
+    setDateTo('');
+  }
 
   useEffect(() => {
     if (!currentSpaceId) return; // wait for the active space
@@ -92,13 +105,18 @@ export default function Transactions() {
           if (t.payment_method !== 'cash') return false;
         } else if (t.card_id !== card) return false;
       }
+      if (dateFrom || dateTo) {
+        const d = (t.transaction_date || '').slice(0, 10);
+        if (dateFrom && d < dateFrom) return false;
+        if (dateTo && d > dateTo) return false;
+      }
       if (needle) {
         const hay = `${t.merchant || ''} ${t.description || ''} ${t.category}`.toLowerCase();
         if (!hay.includes(needle)) return false;
       }
       return true;
     });
-  }, [rows, q, category, source, type, card]);
+  }, [rows, q, category, source, type, card, dateFrom, dateTo]);
 
   const total = useMemo(
     () => filtered.reduce((sum, t) => sum + (t.type === 'income' ? 1 : -1) * Number(t.amount), 0),
@@ -216,7 +234,21 @@ export default function Transactions() {
           ))}
           <option value="cash">Cash</option>
         </select>
+        <label className="filter-date">
+          <span className="filter-date-label">From</span>
+          <input className="field-input" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+        </label>
+        <label className="filter-date">
+          <span className="filter-date-label">To</span>
+          <input className="field-input" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+        </label>
       </div>
+
+      {hasFilters && (
+        <button className="filter-reset" type="button" onClick={resetFilters}>
+          ✕ Reset filters
+        </button>
+      )}
 
       {error && <p className="form-error">{error}</p>}
 

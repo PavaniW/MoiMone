@@ -1677,3 +1677,30 @@ body {
   font-style: italic;
   margin-top: 0.15rem;
 }
+
+/* ---------- Date-range filter + reset ---------- */
+.filter-date {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.filter-date-label {
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.filter-reset {
+  margin-top: 0.65rem;
+  background: none;
+  border: none;
+  color: var(--sienna);
+  font-family: var(--display);
+  font-size: 0.82rem;
+  cursor: pointer;
+  padding: 0.2rem 0;
+}
+.filter-reset:hover {
+  text-decoration: underline;
+}
