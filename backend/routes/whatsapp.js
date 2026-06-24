@@ -2,6 +2,7 @@ import { Router } from 'express';
 import twilio from 'twilio';
 import { parseTransaction, DEFAULT_CURRENCY } from '../services/parser.js';
 import { userCategoryNames } from '../lib/categories.js';
+import { categoryForMerchant } from '../lib/merchant-rules.js';
 import { supabase } from '../lib/supabase.js';
 import { monthRange, currentPeriod } from '../lib/period.js';
 import { userByWhatsApp, matchUserCard } from '../lib/ingest.js';
@@ -94,6 +95,11 @@ router.post('/whatsapp', authenticate, async (req, res) => {
 
     const categories = await userCategoryNames(who.userId);
     const parsed = await parseTransaction(body, { categories });
+
+    // Learned merchant rule overrides the LLM's category guess, if any.
+    const learned = await categoryForMerchant(who.userId, parsed.merchant);
+    if (learned) parsed.category = learned;
+
     const card = await matchUserCard(who.userId, parsed.card_last4);
 
     const { error } = await supabase.from('transactions').insert({

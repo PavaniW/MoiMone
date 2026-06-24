@@ -52,6 +52,7 @@ export default function AddTransaction({ categories = [], cards = [], spaceId = 
   const [form, setForm] = useState(() => toForm(categories, initial, defaultSpace));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [remember, setRemember] = useState(false); // teach merchant → category
 
   const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
 
@@ -87,6 +88,10 @@ export default function AddTransaction({ categories = [], cards = [], spaceId = 
 
     setSaving(true);
     try {
+      // Auto-learn: remember this merchant → category for future auto-imports.
+      if (remember && form.merchant.trim() && form.category) {
+        api.saveMerchantRule(form.merchant.trim(), form.category).catch(() => {});
+      }
       if (isEdit) {
         const updated = await api.updateTransaction(initial.id, { ...payload, space_id: form.space });
         onUpdated?.(updated);
@@ -198,6 +203,20 @@ export default function AddTransaction({ categories = [], cards = [], spaceId = 
           </label>
         )}
       </div>
+
+      {form.merchant.trim() && (
+        <label className="remember-merchant">
+          <input
+            type="checkbox"
+            checked={remember}
+            onChange={(e) => setRemember(e.target.checked)}
+          />
+          <span>
+            Remember: always file <strong>{form.merchant.trim()}</strong> under{' '}
+            <strong>{form.category}</strong> for auto-imported messages
+          </span>
+        </label>
+      )}
 
       {error && <p className="form-error">{error}</p>}
 

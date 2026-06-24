@@ -1648,3 +1648,23 @@ body {
   background: var(--sienna);
   color: #fff;
 }
+
+/* ---------- Remember-merchant checkbox (auto-learn) ---------- */
+.remember-merchant {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin: 0.25rem 0 0.25rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+  line-height: 1.4;
+  cursor: pointer;
+}
+.remember-merchant input {
+  margin-top: 0.15rem;
+  flex-shrink: 0;
+  accent-color: var(--green);
+}
+.remember-merchant strong {
+  color: var(--ink);
+}

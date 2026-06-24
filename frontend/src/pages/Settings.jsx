@@ -30,6 +30,19 @@ const TagIcon = () => (
     <line x1="7" y1="7" x2="7.01" y2="7" />
   </svg>
 );
+const WandIcon = () => (
+  <svg {...svgProps}>
+    <path d="M15 4V2" />
+    <path d="M15 16v-2" />
+    <path d="M8 9h2" />
+    <path d="M20 9h2" />
+    <path d="M17.8 11.8 19 13" />
+    <path d="M15 9h.01" />
+    <path d="M17.8 6.2 19 5" />
+    <path d="m3 21 9-9" />
+    <path d="M12.2 6.2 11 5" />
+  </svg>
+);
 const SmsIcon = () => (
   <svg {...svgProps}>
     <path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 9 9 0 0 1-3.8-.9L3 21l1.3-4A8.4 8.4 0 0 1 3.6 8 8.5 8.5 0 0 1 12 3.5h.5A8.5 8.5 0 0 1 21 11.5z" />
@@ -81,6 +94,11 @@ export default function Settings() {
         <Link to="/categories" className="settings-row">
           <TagIcon />
           <span className="settings-row-label">Categories</span>
+          <Chevron />
+        </Link>
+        <Link to="/merchant-rules" className="settings-row">
+          <WandIcon />
+          <span className="settings-row-label">Auto-categorize</span>
           <Chevron />
         </Link>
         <Link to="/household" className="settings-row">

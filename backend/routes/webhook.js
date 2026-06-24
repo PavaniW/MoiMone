@@ -3,6 +3,7 @@ import { parseTransaction } from '../services/parser.js';
 import { supabase } from '../lib/supabase.js';
 import { userByIngestToken, matchUserCard } from '../lib/ingest.js';
 import { userCategoryNames } from '../lib/categories.js';
+import { categoryForMerchant } from '../lib/merchant-rules.js';
 
 const router = Router();
 
@@ -26,6 +27,10 @@ router.post('/sms', async (req, res, next) => {
 
     const categories = await userCategoryNames(who.userId);
     const parsed = await parseTransaction(text, { categories });
+
+    // Learned merchant rule overrides the LLM's category guess, if any.
+    const learned = await categoryForMerchant(who.userId, parsed.merchant);
+    if (learned) parsed.category = learned;
 
     // Auto-link to one of the user's registered cards by last 4 digits.
     const card = await matchUserCard(who.userId, parsed.card_last4);

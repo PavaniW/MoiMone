@@ -77,6 +77,12 @@ export const api = {
   updateCard: (id, data) => request(`/api/cards/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteCard: (id) => request(`/api/cards/${id}`, { method: 'DELETE' }),
 
+  // Merchant rules (auto-learn merchant → category)
+  getMerchantRules: () => request('/api/merchant-rules'),
+  saveMerchantRule: (merchant, category) =>
+    request('/api/merchant-rules', { method: 'POST', body: JSON.stringify({ merchant, category }) }),
+  deleteMerchantRule: (id) => request(`/api/merchant-rules/${id}`, { method: 'DELETE' }),
+
   // Categories
   getCategories: () => request('/api/categories'),
   createCategory: (data) =>

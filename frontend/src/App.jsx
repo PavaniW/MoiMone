@@ -6,6 +6,7 @@ import Goals from './pages/Goals.jsx';
 import Chat from './pages/Chat.jsx';
 import Cards from './pages/Cards.jsx';
 import Categories from './pages/Categories.jsx';
+import MerchantRules from './pages/MerchantRules.jsx';
 import Household from './pages/Household.jsx';
 import Settings from './pages/Settings.jsx';
 import SmsSetup from './pages/SmsSetup.jsx';
@@ -144,6 +145,7 @@ export default function App() {
           <Route path="/chat" element={<Chat />} />
           <Route path="/cards" element={<Cards />} />
           <Route path="/categories" element={<Categories />} />
+          <Route path="/merchant-rules" element={<MerchantRules />} />
           <Route path="/household" element={<Household />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/sms-setup" element={<SmsSetup />} />
