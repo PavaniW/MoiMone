@@ -49,6 +49,8 @@ router.post('/sms', async (req, res, next) => {
         raw_text: text,
         created_by: who.userId,
         space_id: who.spaceId, // always the user's private space (never shared)
+        // Use the date from the message when the parser found one; else default now().
+        ...(parsed.date ? { transaction_date: parsed.date } : {}),
       })
       .select()
       .single();

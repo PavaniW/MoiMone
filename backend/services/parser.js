@@ -52,9 +52,14 @@ function buildTransactionSchema(categories) {
         type: 'string',
         description: 'Last 4 digits of the card if stated, otherwise an empty string',
       },
+      date: {
+        type: 'string',
+        description:
+          'The date the transaction occurred, in ISO 8601 (YYYY-MM-DD), if the message states one; otherwise an empty string',
+      },
       confidence: { type: 'number', description: 'Confidence in the extraction from 0 to 1' },
     },
-    required: ['amount', 'currency', 'merchant', 'type', 'category', 'payment_method', 'card_last4', 'confidence'],
+    required: ['amount', 'currency', 'merchant', 'type', 'category', 'payment_method', 'card_last4', 'date', 'confidence'],
   };
 }
 
@@ -68,9 +73,21 @@ Rules:
 - category: choose the single best fit from the allowed list. Use "Salary" only for clear salary/payroll income. Use "Other" when nothing fits.
 - payment_method: "credit" if a credit card was used; "debit" for a debit card or a direct account/current/savings debit; "cash" for cash; otherwise "other".
 - card_last4: the last 4 digits of the card or account if the message states them (e.g. "card ending 4521"), otherwise an empty string.
+- date: the date the transaction occurred as stated in the message, in ISO 8601 (YYYY-MM-DD). The message may write it as DD/MM/YYYY, DD-MMM-YY, etc. — convert it. Use the provided current date to fill in a missing year. If no date is stated, use an empty string (do NOT guess today's date).
 - confidence: your confidence in the overall extraction, from 0 to 1.
 
 Return only the structured object — no commentary.`;
+
+// Validate a model-supplied date → ISO string, or null if absent/implausible.
+function cleanDate(value) {
+  const s = String(value ?? '').trim();
+  if (!s) return null;
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return null;
+  const year = d.getUTCFullYear();
+  if (year < 2000 || year > 2100) return null; // guard against invented dates
+  return d.toISOString();
+}
 
 // Guarantee a valid, consistent shape regardless of which model produced it.
 // `categories` is the list considered valid; anything else falls back to "Other".
@@ -83,9 +100,10 @@ function normalize(p, categories) {
   const payment_method = PAYMENT_METHODS.includes(p?.payment_method) ? p.payment_method : 'other';
   const digits = String(p?.card_last4 ?? '').replace(/\D/g, '');
   const card_last4 = digits.length === 4 ? digits : null;
+  const date = cleanDate(p?.date);
   let confidence = Number(p?.confidence);
   if (!(confidence >= 0 && confidence <= 1)) confidence = 0.5;
-  return { amount, currency, merchant, type, category, payment_method, card_last4, confidence };
+  return { amount, currency, merchant, type, category, payment_method, card_last4, date, confidence };
 }
 
 function chooseProvider() {
@@ -98,14 +116,14 @@ function chooseProvider() {
 
 // --- Claude provider ---
 let anthropic;
-async function parseWithClaude(rawText, categories) {
+async function parseWithClaude(rawText, categories, today) {
   if (!anthropic) anthropic = new Anthropic();
   const response = await anthropic.messages.create({
     model: CLAUDE_MODEL,
     max_tokens: 1024,
     thinking: { type: 'disabled' },
     system: SYSTEM_PROMPT,
-    messages: [{ role: 'user', content: rawText }],
+    messages: [{ role: 'user', content: `Today is ${today}.\n\n${rawText}` }],
     output_config: { format: { type: 'json_schema', schema: buildTransactionSchema(categories) } },
   });
   if (response.stop_reason === 'refusal') throw new Error('model refused to parse the message');
@@ -115,12 +133,12 @@ async function parseWithClaude(rawText, categories) {
 }
 
 // --- Groq provider (free hosted, OpenAI-compatible) ---
-async function parseWithGroq(rawText, categories) {
+async function parseWithGroq(rawText, categories, today) {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) throw new Error('GROQ_API_KEY is not set');
   const model = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
 
-  const jsonInstruction = `Return a JSON object with exactly these keys: amount (number), currency (string), merchant (string), type ("expense" or "income"), category (one of: ${categories.join(', ')}), payment_method (one of: credit, debit, cash, other), card_last4 (string: the card's last 4 digits, or "" if not stated), confidence (number 0-1).`;
+  const jsonInstruction = `Return a JSON object with exactly these keys: amount (number), currency (string), merchant (string), type ("expense" or "income"), category (one of: ${categories.join(', ')}), payment_method (one of: credit, debit, cash, other), card_last4 (string: the card's last 4 digits, or "" if not stated), date (string: the transaction date as ISO YYYY-MM-DD if the message states one, else ""), confidence (number 0-1).`;
 
   let res;
   try {
@@ -133,7 +151,7 @@ async function parseWithGroq(rawText, categories) {
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: `${SYSTEM_PROMPT}\n\n${jsonInstruction}` },
-          { role: 'user', content: rawText },
+          { role: 'user', content: `Today is ${today}.\n\n${rawText}` },
         ],
       }),
     });
@@ -151,7 +169,7 @@ async function parseWithGroq(rawText, categories) {
 }
 
 // --- Ollama provider (local, free) ---
-async function parseWithOllama(rawText, categories) {
+async function parseWithOllama(rawText, categories, today) {
   const base = process.env.OLLAMA_URL || 'http://localhost:11434';
   const model = process.env.OLLAMA_MODEL || 'llama3.2';
 
@@ -167,7 +185,7 @@ async function parseWithOllama(rawText, categories) {
         options: { temperature: 0 },
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: rawText },
+          { role: 'user', content: `Today is ${today}.\n\n${rawText}` },
         ],
       }),
     });
@@ -197,11 +215,12 @@ export async function parseTransaction(rawText, { categories } = {}) {
     throw new Error('parseTransaction: rawText is empty');
   }
   const allowed = Array.isArray(categories) && categories.length ? categories : CATEGORIES;
+  const today = new Date().toISOString().slice(0, 10);
   const provider = chooseProvider();
   let raw;
-  if (provider === 'ollama') raw = await parseWithOllama(rawText, allowed);
-  else if (provider === 'groq') raw = await parseWithGroq(rawText, allowed);
-  else if (provider === 'claude') raw = await parseWithClaude(rawText, allowed);
+  if (provider === 'ollama') raw = await parseWithOllama(rawText, allowed, today);
+  else if (provider === 'groq') raw = await parseWithGroq(rawText, allowed, today);
+  else if (provider === 'claude') raw = await parseWithClaude(rawText, allowed, today);
   else throw new Error(`Unknown PARSER_PROVIDER "${provider}" (use "ollama", "groq", or "claude")`);
   return normalize(raw, allowed);
 }

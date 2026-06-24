@@ -114,6 +114,8 @@ router.post('/whatsapp', authenticate, async (req, res) => {
       raw_text: body,
       created_by: who.userId,
       space_id: who.spaceId, // user's private space
+      // Use the date from the message when the parser found one; else default now().
+      ...(parsed.date ? { transaction_date: parsed.date } : {}),
     });
     if (error) throw new Error(error.message);
 
