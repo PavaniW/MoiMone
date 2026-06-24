@@ -1185,10 +1185,16 @@ body {
     border-bottom: none;
   }
   .ledger-row {
-    grid-template-columns: 52px 1fr 92px;
+    grid-template-columns: 46px minmax(0, 1fr) auto;
+    column-gap: 0.5rem;
   }
   .ledger-row.edit {
-    grid-template-columns: 52px 1fr 92px 60px;
+    /* amount sizes to its content (big numbers no longer overlap the actions) */
+    grid-template-columns: 46px minmax(0, 1fr) auto auto;
+    column-gap: 0.5rem;
+  }
+  .ledger-merchant {
+    min-width: 0; /* allow the merchant cell to shrink instead of pushing amount */
   }
   .ledger-cat,
   .src-tag,

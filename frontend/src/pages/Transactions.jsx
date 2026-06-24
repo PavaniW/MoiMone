@@ -24,6 +24,7 @@ export default function Transactions() {
   const [rows, setRows] = useState([]);
   const [categories, setCategories] = useState([]);
   const [cards, setCards] = useState([]);
+  const [goalsList, setGoalsList] = useState([]);
   const [showAdd, setShowAdd] = useState(false);
   const [editing, setEditing] = useState(null); // transaction being edited, or null
   const { currentSpaceId, currentSpace, refreshTick } = useSpace();
@@ -60,15 +61,17 @@ export default function Transactions() {
     loadedSpace.current = currentSpaceId;
     (async () => {
       try {
-        const [txns, cats, cds] = await Promise.all([
+        const [txns, cats, cds, gls] = await Promise.all([
           api.getTransactions(`?space=${currentSpaceId}`),
           api.getCategories(),
           api.getCards(),
+          api.getGoals(`?space=${currentSpaceId}`),
         ]);
         if (active) {
           setRows(txns);
           setCategories(cats);
           setCards(cds);
+          setGoalsList(gls);
           setStatus('ready');
         }
       } catch (err) {
@@ -125,6 +128,10 @@ export default function Transactions() {
   }, [rows, q, category, source, type, card, dateFrom, dateTo, needsReview]);
 
   const reviewCount = useMemo(() => rows.filter(isReview).length, [rows]);
+  const savedTotal = useMemo(
+    () => filtered.filter((t) => t.type === 'savings').reduce((s, t) => s + Number(t.amount), 0),
+    [filtered]
+  );
 
   // Net = income − expense; savings is set-aside money, not part of the net.
   const total = useMemo(
@@ -202,6 +209,7 @@ export default function Transactions() {
           <AddTransaction
             categories={categories}
             cards={cards}
+            goals={goalsList}
             spaceId={currentSpaceId}
             onCreated={handleCreated}
           />
@@ -285,6 +293,7 @@ export default function Transactions() {
           </h3>
           <span className="panel-note">
             net {total >= 0 ? '+' : '−'} {CURRENCY} {formatAmount(total)}
+            {savedTotal > 0 && ` · saved ${CURRENCY} ${formatAmount(savedTotal)}`}
           </span>
         </div>
 
@@ -311,7 +320,7 @@ export default function Transactions() {
                       style={{ background: colorOf[t.category] || FALLBACK_COLOR }}
                     />
                     <span className="merchant-text">
-                      {t.merchant || '—'}
+                      {isSaving ? (t.goal?.name ? `Savings → ${t.goal.name}` : 'Savings') : t.merchant || '—'}
                       {label && <span className="card-tag">{label}</span>}
                       {isShared && memberName[t.created_by] && (
                         <span className="who-tag">by {memberName[t.created_by]}</span>
@@ -370,6 +379,7 @@ export default function Transactions() {
             <AddTransaction
               categories={categories}
               cards={cards}
+              goals={goalsList}
               initial={editing}
               onUpdated={handleUpdated}
               onCancel={() => setEditing(null)}

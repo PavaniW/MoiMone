@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { api } from '../lib/api.js';
 import { Spinner } from './Loading.jsx';
 import { useSpace } from '../space.jsx';
@@ -46,7 +46,7 @@ function toForm(categories, t, defaultSpace) {
 //   • create mode (no `initial`): saves a new row, calls onCreated(row)
 //   • edit mode (`initial` set): updates that row, calls onUpdated(row)
 // onCancel, when provided, renders a Cancel button (used by the edit modal).
-export default function AddTransaction({ categories = [], cards = [], spaceId = null, initial = null, onCreated, onUpdated, onCancel }) {
+export default function AddTransaction({ categories = [], cards = [], goals = [], spaceId = null, initial = null, onCreated, onUpdated, onCancel }) {
   const isEdit = Boolean(initial);
   const { spaces } = useSpace();
   const defaultSpace =
@@ -55,20 +55,9 @@ export default function AddTransaction({ categories = [], cards = [], spaceId = 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [remember, setRemember] = useState(false); // teach merchant → category
-  const [goals, setGoals] = useState([]);
 
   const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
   const isSavings = form.type === 'savings';
-
-  // Goals (for linking a savings entry) in the chosen space.
-  useEffect(() => {
-    if (!form.space) return;
-    let active = true;
-    api.getGoals(`?space=${form.space}`).then((g) => active && setGoals(g)).catch(() => {});
-    return () => {
-      active = false;
-    };
-  }, [form.space]);
 
   async function submit(e) {
     e.preventDefault();
