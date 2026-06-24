@@ -15,6 +15,8 @@ export default function Cards() {
   const [cards, setCards] = useState([]);
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
+  const [editBalId, setEditBalId] = useState(null); // account whose balance is being edited
+  const [balDraft, setBalDraft] = useState('');
 
   useEffect(() => {
     let active = true;
@@ -53,14 +55,19 @@ export default function Cards() {
     }
   }
 
-  async function editBalance(c) {
-    const input = window.prompt(`Set balance for ${c.nickname} (${CURRENCY})`, c.balance ?? 0);
-    if (input === null) return;
-    const n = Number(input);
+  function startBal(c) {
+    setError(null);
+    setBalDraft(String(c.balance ?? 0));
+    setEditBalId(c.id);
+  }
+
+  async function saveBal(c) {
+    const n = Number(balDraft);
     if (Number.isNaN(n)) return setError('Enter a number.');
     try {
       const updated = await api.updateCard(c.id, { balance: n });
       setCards((cs) => cs.map((x) => (x.id === c.id ? updated : x)));
+      setEditBalId(null);
     } catch (err) {
       setError(err.message);
     }
@@ -213,13 +220,32 @@ export default function Cards() {
                 {c.type}
                 {c.last4 ? ` ••${c.last4}` : ''}
               </div>
-              <button
-                className={`card-bal num ${Number(c.balance) < 0 ? 'neg' : ''}`}
-                title="Tap to set balance"
-                onClick={() => editBalance(c)}
-              >
-                {CURRENCY} {formatAmount(Number(c.balance || 0))}
-              </button>
+              {editBalId === c.id ? (
+                <div className="card-bal-edit">
+                  <input
+                    className="field-input num"
+                    type="number"
+                    step="0.01"
+                    value={balDraft}
+                    onChange={(e) => setBalDraft(e.target.value)}
+                    autoFocus
+                  />
+                  <button className="btn-primary btn-sm" type="button" onClick={() => saveBal(c)}>
+                    Save
+                  </button>
+                  <button className="btn-secondary btn-sm" type="button" onClick={() => setEditBalId(null)}>
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  className={`card-bal num ${Number(c.balance) < 0 ? 'neg' : ''}`}
+                  title="Tap to set balance"
+                  onClick={() => startBal(c)}
+                >
+                  {CURRENCY} {formatAmount(Number(c.balance || 0))}
+                </button>
+              )}
             </div>
           ))}
         </div>
