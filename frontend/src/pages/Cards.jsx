@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
+import { formatAmount, CURRENCY } from '../lib/format.js';
 import Loading, { Spinner } from '../components/Loading.jsx';
 import BackLink from '../components/BackLink.jsx';
 
 const SWATCHES = ['#2f6b4f', '#b0563c', '#45B7D1', '#DDA0DD', '#FFC857', '#4ECDC4'];
-const EMPTY = { nickname: '', bank: '', type: 'credit', last4: '', color: SWATCHES[0] };
+const EMPTY = { nickname: '', bank: '', type: 'credit', last4: '', color: SWATCHES[0], balance: '' };
 
 // Cards manager — register your cards once; bank SMS auto-link by last 4 digits,
 // and manual entry lets you pick from these.
@@ -41,6 +42,7 @@ export default function Cards() {
         type: form.type,
         last4: form.last4.trim() || null,
         color: form.color,
+        balance: form.balance === '' ? 0 : Number(form.balance),
       });
       setCards((c) => [...c, created]);
       setForm(EMPTY);
@@ -48,6 +50,19 @@ export default function Cards() {
       setError(err.message);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function editBalance(c) {
+    const input = window.prompt(`Set balance for ${c.nickname} (${CURRENCY})`, c.balance ?? 0);
+    if (input === null) return;
+    const n = Number(input);
+    if (Number.isNaN(n)) return setError('Enter a number.');
+    try {
+      const updated = await api.updateCard(c.id, { balance: n });
+      setCards((cs) => cs.map((x) => (x.id === c.id ? updated : x)));
+    } catch (err) {
+      setError(err.message);
     }
   }
 
@@ -97,20 +112,17 @@ export default function Cards() {
         </div>
         <form className="entry-form" onSubmit={submit}>
           <div className="seg">
-            <button
-              type="button"
-              className={form.type === 'credit' ? 'seg-btn active' : 'seg-btn'}
-              onClick={() => setForm((f) => ({ ...f, type: 'credit' }))}
-            >
-              Credit
-            </button>
-            <button
-              type="button"
-              className={form.type === 'debit' ? 'seg-btn active' : 'seg-btn'}
-              onClick={() => setForm((f) => ({ ...f, type: 'debit' }))}
-            >
-              Debit
-            </button>
+            {['credit', 'debit', 'bank'].map((t) => (
+              <button
+                key={t}
+                type="button"
+                className={form.type === t ? 'seg-btn active' : 'seg-btn'}
+                onClick={() => setForm((f) => ({ ...f, type: t }))}
+                style={{ textTransform: 'capitalize' }}
+              >
+                {t}
+              </button>
+            ))}
           </div>
 
           <div className="field-grid">
@@ -144,6 +156,18 @@ export default function Cards() {
                 value={form.last4}
                 onChange={set('last4')}
                 placeholder="4521"
+              />
+            </label>
+            <label className="field">
+              <span className="field-label">Opening balance</span>
+              <input
+                className="field-input num"
+                type="number"
+                step="0.01"
+                inputMode="decimal"
+                value={form.balance}
+                onChange={set('balance')}
+                placeholder="0.00"
               />
             </label>
             <label className="field">
@@ -189,6 +213,13 @@ export default function Cards() {
                 {c.type}
                 {c.last4 ? ` ••${c.last4}` : ''}
               </div>
+              <button
+                className={`card-bal num ${Number(c.balance) < 0 ? 'neg' : ''}`}
+                title="Tap to set balance"
+                onClick={() => editBalance(c)}
+              >
+                {CURRENCY} {formatAmount(Number(c.balance || 0))}
+              </button>
             </div>
           ))}
         </div>

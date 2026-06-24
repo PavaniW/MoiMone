@@ -90,11 +90,11 @@ async function weeklySummaryLine(spaceId) {
   const byCat = {};
   for (const t of data || []) {
     const a = Number(t.amount);
-    if (t.type === 'income') continue;
     if (t.type === 'savings') {
       saved += a;
       continue;
     }
+    if (t.type !== 'expense') continue; // skip income + transfers
     spent += a;
     byCat[t.category] = (byCat[t.category] || 0) + a;
   }

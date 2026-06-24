@@ -22,6 +22,8 @@ function toForm(categories, t, defaultSpace) {
       paidWith: '',
       space: defaultSpace || '',
       goal: '',
+      from: '',
+      to: '',
     };
   }
   return {
@@ -39,6 +41,8 @@ function toForm(categories, t, defaultSpace) {
         : '',
     space: t.space_id || defaultSpace || '',
     goal: t.goal_id || '',
+    from: t.type === 'transfer' ? t.card_id || '' : '',
+    to: t.to_card_id || '',
   };
 }
 
@@ -58,6 +62,7 @@ export default function AddTransaction({ categories = [], cards = [], goals = []
 
   const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
   const isSavings = form.type === 'savings';
+  const isTransfer = form.type === 'transfer';
 
   async function submit(e) {
     e.preventDefault();
@@ -65,6 +70,10 @@ export default function AddTransaction({ categories = [], cards = [], goals = []
 
     if (!Number(form.amount)) {
       setError('Enter an amount.');
+      return;
+    }
+    if (isTransfer && (!form.from || !form.to || form.from === form.to)) {
+      setError('Pick two different accounts to transfer between.');
       return;
     }
 
@@ -75,7 +84,10 @@ export default function AddTransaction({ categories = [], cards = [], goals = []
       description: form.description.trim() || null,
     };
 
-    if (isSavings) {
+    if (isTransfer) {
+      payload.card_id = form.from;
+      payload.to_card_id = form.to;
+    } else if (isSavings) {
       // Savings: set aside money, optionally linked to a goal. No card/category.
       payload.goal_id = form.goal || null;
     } else {
@@ -141,6 +153,13 @@ export default function AddTransaction({ categories = [], cards = [], goals = []
         >
           Savings
         </button>
+        <button
+          type="button"
+          className={form.type === 'transfer' ? 'seg-btn active' : 'seg-btn'}
+          onClick={() => setForm((f) => ({ ...f, type: 'transfer' }))}
+        >
+          Transfer
+        </button>
       </div>
 
       <div className="field-grid">
@@ -158,7 +177,37 @@ export default function AddTransaction({ categories = [], cards = [], goals = []
           />
         </label>
 
-        {!isSavings && (
+        {isTransfer && (
+          <label className="field">
+            <span className="field-label">From account</span>
+            <select className="field-input" value={form.from} onChange={set('from')}>
+              <option value="">—</option>
+              {cards.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nickname}
+                  {c.last4 ? ` ••${c.last4}` : ''}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+
+        {isTransfer && (
+          <label className="field">
+            <span className="field-label">To account</span>
+            <select className="field-input" value={form.to} onChange={set('to')}>
+              <option value="">—</option>
+              {cards.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nickname}
+                  {c.last4 ? ` ••${c.last4}` : ''}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+
+        {!isSavings && !isTransfer && (
           <label className="field">
             <span className="field-label">Merchant</span>
             <input
@@ -171,7 +220,7 @@ export default function AddTransaction({ categories = [], cards = [], goals = []
           </label>
         )}
 
-        {!isSavings && (
+        {!isSavings && !isTransfer && (
           <label className="field">
             <span className="field-label">Category</span>
             <select className="field-input" value={form.category} onChange={set('category')}>
@@ -209,7 +258,7 @@ export default function AddTransaction({ categories = [], cards = [], goals = []
           />
         </label>
 
-        {!isSavings && (
+        {!isSavings && !isTransfer && (
           <label className="field">
             <span className="field-label">Paid with</span>
             <select className="field-input" value={form.paidWith} onChange={set('paidWith')}>

@@ -20,7 +20,7 @@ function summarize(rows) {
       totalIncome += amt;
     } else if (t.type === 'savings') {
       totalSaved += amt;
-    } else {
+    } else if (t.type === 'expense') {
       totalExpense += amt;
       byCategory[t.category] = (byCategory[t.category] || 0) + amt;
     }

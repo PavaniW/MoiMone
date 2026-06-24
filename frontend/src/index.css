@@ -2037,3 +2037,60 @@ body {
 .recharts-tooltip-wrapper {
   z-index: 30 !important;
 }
+
+/* ---------- Dashboard: account balances ---------- */
+.acct-list {
+  display: flex;
+  flex-direction: column;
+}
+.acct-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--line);
+}
+.acct-row:last-child {
+  border-bottom: none;
+}
+.acct-name {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 500;
+  min-width: 0;
+}
+.acct-bal {
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.acct-bal.neg {
+  color: var(--sienna);
+}
+
+/* Editable balance chip on the Accounts page */
+.card-bal {
+  margin-top: 0.5rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--ink);
+  background: none;
+  border: none;
+  border-bottom: 1px dashed var(--line);
+  padding: 0 0 0.1rem;
+  cursor: pointer;
+  text-align: left;
+}
+.card-bal:hover {
+  border-bottom-color: var(--green);
+}
+.card-bal.neg {
+  color: var(--sienna);
+}
+
+/* Transfer amount in the ledger (neutral) */
+.ledger-amount.transfer {
+  color: var(--muted);
+}

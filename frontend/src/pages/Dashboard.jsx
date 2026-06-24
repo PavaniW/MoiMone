@@ -42,7 +42,7 @@ function build(categories, cards, windowTxns, recentTxns, budgetRows, period) {
       income += amount;
     } else if (t.type === 'savings') {
       saved += amount;
-    } else {
+    } else if (t.type === 'expense') {
       spent += amount;
       byCategory[t.category] = (byCategory[t.category] || 0) + amount;
 
@@ -95,6 +95,7 @@ function build(categories, cards, windowTxns, recentTxns, budgetRows, period) {
   }));
 
   return {
+    accounts: cards,
     summary: { spent, income, saved, available: income - spent - saved },
     spendByCategory,
     budgets,
@@ -164,7 +165,7 @@ export default function Dashboard() {
     );
   }
 
-  const { summary, spendByCategory, budgets, totalBudget, overCount, trend, recent, byCard } = state.data;
+  const { accounts, summary, spendByCategory, budgets, totalBudget, overCount, trend, recent, byCard } = state.data;
   const cardMax = byCard.reduce((m, c) => Math.max(m, c.amount), 0);
   const trendMax = trend.reduce((m, t) => Math.max(m, t.amount), 0);
   const budgetPct = totalBudget ? Math.min(100, (summary.spent / totalBudget) * 100) : 0;
@@ -205,6 +206,31 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* Accounts + balances */}
+      {accounts.length > 0 && (
+        <div className="panel" style={{ marginTop: '1.25rem' }}>
+          <div className="panel-head">
+            <h3 className="panel-title">Accounts</h3>
+            <span className="panel-note">balances</span>
+          </div>
+          <div className="acct-list">
+            {accounts.map((a) => (
+              <div className="acct-row" key={a.id}>
+                <span className="acct-name">
+                  <span className="cat-dot" style={{ background: a.color || '#9A9384' }} />
+                  {a.nickname}
+                  {a.last4 ? <span className="card-tag"> ••{a.last4}</span> : ''}
+                </span>
+                <span className={`acct-bal num ${Number(a.balance) < 0 ? 'neg' : ''}`}>
+                  <span className="sym">{CURRENCY}</span>
+                  {formatAmount(Number(a.balance))}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Total monthly budget */}
       {totalBudget > 0 && (

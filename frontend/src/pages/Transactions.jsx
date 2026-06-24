@@ -135,7 +135,8 @@ export default function Transactions() {
     () =>
       filtered.reduce((sum, t) => {
         if (t.type === 'income') return sum + Number(t.amount);
-        return sum - Number(t.amount); // expense and savings both reduce it
+        if (t.type === 'transfer') return sum; // moves between your own accounts
+        return sum - Number(t.amount); // expense + savings reduce money in hand
       }, 0),
     [filtered]
   );
@@ -245,6 +246,7 @@ export default function Transactions() {
           <option value="expense">Expense</option>
           <option value="income">Income</option>
           <option value="savings">Savings</option>
+          <option value="transfer">Transfer</option>
         </select>
         <select className="field-input" value={source} onChange={(e) => setSource(e.target.value)}>
           <option value="">All sources</option>
@@ -305,8 +307,15 @@ export default function Transactions() {
             {filtered.map((t) => {
               const isIncome = t.type === 'income';
               const isSaving = t.type === 'savings';
-              const label = cardLabel(t, cardsById);
-              const name = isSaving ? (t.goal?.name ? `Savings → ${t.goal.name}` : 'Savings') : t.merchant || '—';
+              const isTransfer = t.type === 'transfer';
+              const label = isTransfer ? '' : cardLabel(t, cardsById);
+              const name = isSaving
+                ? t.goal?.name
+                  ? `Savings → ${t.goal.name}`
+                  : 'Savings'
+                : isTransfer
+                  ? `Transfer: ${t.card?.nickname || '—'} → ${t.to_account?.nickname || '—'}`
+                  : t.merchant || '—';
               return (
                 <div className="ledger-row edit body" key={t.id}>
                   <span className="ledger-date num">{formatDay(t.transaction_date)}</span>
@@ -339,8 +348,10 @@ export default function Transactions() {
                     </select>
                   </span>
                   <span className="src-tag hide-sm">{t.source}</span>
-                  <span className={`ledger-amount ${isIncome ? 'income' : isSaving ? 'saved' : 'expense'}`}>
-                    {isIncome ? '+' : isSaving ? '⇢' : '−'}
+                  <span
+                    className={`ledger-amount ${isIncome ? 'income' : isSaving ? 'saved' : isTransfer ? 'transfer' : 'expense'}`}
+                  >
+                    {isIncome ? '+' : isSaving ? '⇢' : isTransfer ? '⇄' : '−'}
                     <span className="sym">{CURRENCY}</span>
                     {formatAmount(Number(t.amount))}
                   </span>
