@@ -2029,3 +2029,11 @@ body {
     font-size: 1rem;
   }
 }
+
+/* Donut tooltip must sit above the center-total overlay */
+.pie-center {
+  z-index: 1;
+}
+.recharts-tooltip-wrapper {
+  z-index: 30 !important;
+}
