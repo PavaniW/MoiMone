@@ -1192,6 +1192,9 @@ body {
   .filters {
     grid-template-columns: 1fr 1fr;
   }
+  .filter-dates {
+    grid-column: 1 / -1; /* From + To share one full-width row on mobile */
+  }
   .field-grid {
     grid-template-columns: 1fr;
   }
@@ -1679,6 +1682,15 @@ body {
 }
 
 /* ---------- Date-range filter + reset ---------- */
+.filter-dates {
+  display: flex;
+  gap: 0.6rem;
+  grid-column: span 2; /* keep From + To together on desktop */
+}
+.filter-dates .filter-date {
+  flex: 1;
+  min-width: 0;
+}
 .filter-date {
   display: flex;
   flex-direction: column;

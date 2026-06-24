@@ -234,14 +234,16 @@ export default function Transactions() {
           ))}
           <option value="cash">Cash</option>
         </select>
-        <label className="filter-date">
-          <span className="filter-date-label">From</span>
-          <input className="field-input" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
-        </label>
-        <label className="filter-date">
-          <span className="filter-date-label">To</span>
-          <input className="field-input" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
-        </label>
+        <div className="filter-dates">
+          <label className="filter-date">
+            <span className="filter-date-label">From</span>
+            <input className="field-input" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+          </label>
+          <label className="filter-date">
+            <span className="filter-date-label">To</span>
+            <input className="field-input" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+          </label>
+        </div>
       </div>
 
       {hasFilters && (
