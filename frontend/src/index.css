@@ -1668,3 +1668,12 @@ body {
 .remember-merchant strong {
   color: var(--ink);
 }
+
+/* Free-text note shown under a transaction's merchant */
+.txn-note {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-style: italic;
+  margin-top: 0.15rem;
+}

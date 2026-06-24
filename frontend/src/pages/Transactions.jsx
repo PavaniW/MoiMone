@@ -257,6 +257,7 @@ export default function Transactions() {
                       {isShared && memberName[t.created_by] && (
                         <span className="who-tag">by {memberName[t.created_by]}</span>
                       )}
+                      {t.description && <span className="txn-note">{t.description}</span>}
                     </span>
                   </span>
                   <span className="hide-sm">

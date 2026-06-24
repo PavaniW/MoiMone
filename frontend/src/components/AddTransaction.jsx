@@ -204,6 +204,17 @@ export default function AddTransaction({ categories = [], cards = [], spaceId = 
         )}
       </div>
 
+      <label className="field" style={{ marginTop: '0.75rem' }}>
+        <span className="field-label">Notes (optional)</span>
+        <textarea
+          className="field-input"
+          rows={2}
+          value={form.description}
+          onChange={set('description')}
+          placeholder="e.g. Hima's wedding gift, anniversary dinner…"
+        />
+      </label>
+
       {form.merchant.trim() && (
         <label className="remember-merchant">
           <input
