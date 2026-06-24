@@ -306,6 +306,7 @@ export default function Transactions() {
               const isIncome = t.type === 'income';
               const isSaving = t.type === 'savings';
               const label = cardLabel(t, cardsById);
+              const name = isSaving ? (t.goal?.name ? `Savings → ${t.goal.name}` : 'Savings') : t.merchant || '—';
               return (
                 <div className="ledger-row edit body" key={t.id}>
                   <span className="ledger-date num">{formatDay(t.transaction_date)}</span>
@@ -315,11 +316,13 @@ export default function Transactions() {
                       style={{ background: colorOf[t.category] || FALLBACK_COLOR }}
                     />
                     <span className="merchant-text">
-                      {isSaving ? (t.goal?.name ? `Savings → ${t.goal.name}` : 'Savings') : t.merchant || '—'}
-                      {label && <span className="card-tag">{label}</span>}
-                      {isShared && memberName[t.created_by] && (
-                        <span className="who-tag">by {memberName[t.created_by]}</span>
-                      )}
+                      <span className="merchant-line">
+                        <span className="merchant-name" title={name}>{name}</span>
+                        {label && <span className="card-tag">{label}</span>}
+                        {isShared && memberName[t.created_by] && (
+                          <span className="who-tag">by {memberName[t.created_by]}</span>
+                        )}
+                      </span>
                       {t.description && <span className="txn-note">{t.description}</span>}
                     </span>
                   </span>

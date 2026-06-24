@@ -657,6 +657,7 @@ body {
   display: flex;
   align-items: center;
   gap: 0.55rem;
+  min-width: 0; /* allow the cell to shrink so long names ellipsis, not overflow */
 }
 
 .cat-dot {
@@ -1892,4 +1893,37 @@ body {
 .wa-cmd-desc {
   font-size: 0.82rem;
   color: var(--muted);
+}
+
+/* ---------- Ledger merchant: truncate long names (ellipsis + title tooltip) ---------- */
+.merchant-line {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+}
+.merchant-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.card-tag,
+.who-tag {
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  /* No room for the per-row card label on phones — hide it (still on desktop). */
+  .card-tag {
+    display: none;
+  }
+  /* Keep the big summary numbers inside their 2×2 cells. */
+  .summary-value {
+    font-size: 1.15rem;
+  }
+  .summary-value .sym {
+    font-size: 0.7rem;
+    margin-right: 0.2rem;
+  }
 }

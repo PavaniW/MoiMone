@@ -5,13 +5,14 @@ export default function TransactionItem({ transaction }) {
   const { transaction_date, merchant, category, source, type, amount, color } = transaction;
   const isIncome = type === 'income';
   const isSaving = type === 'savings';
+  const name = isSaving ? (transaction.goal?.name ? `Savings → ${transaction.goal.name}` : 'Savings') : merchant || '—';
 
   return (
     <div className="ledger-row body">
       <span className="ledger-date num">{formatDay(transaction_date)}</span>
       <span className="ledger-merchant">
         <span className="cat-dot" style={{ background: color }} />
-        {merchant}
+        <span className="merchant-name" title={name}>{name}</span>
       </span>
       <span className="ledger-cat">{category}</span>
       <span className="src-tag">{source}</span>
