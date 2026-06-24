@@ -1693,14 +1693,21 @@ body {
 }
 .filter-reset {
   margin-top: 0.65rem;
-  background: none;
-  border: none;
-  color: var(--sienna);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  color: var(--muted);
   font-family: var(--display);
-  font-size: 0.82rem;
+  font-size: 0.8rem;
+  border-radius: 999px;
+  padding: 0.35rem 0.85rem;
   cursor: pointer;
-  padding: 0.2rem 0;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
 }
 .filter-reset:hover {
-  text-decoration: underline;
+  border-color: var(--sienna);
+  color: var(--sienna);
+  background: #fff;
 }
