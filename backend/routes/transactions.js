@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase.js';
 import { monthRange } from '../lib/period.js';
 import { PAYMENT_METHODS } from '../services/parser.js';
 import { targetSpace } from '../lib/scope.js';
+import { bumpAccount } from '../lib/accounts.js';
 
 const router = Router();
 
@@ -38,7 +39,19 @@ function badRequest(message) {
   return err;
 }
 
-const TYPES = ['expense', 'income', 'savings'];
+const TYPES = ['expense', 'income', 'savings', 'transfer'];
+
+// Apply (sign +1) or reverse (sign -1) a transaction's effect on account balances.
+// expense lowers its account, income raises it, transfer moves between accounts.
+async function applyBalanceEffect(t, sign, userId) {
+  const amt = Number(t.amount) * sign;
+  if (t.type === 'expense' && t.card_id) await bumpAccount(t.card_id, -amt, userId);
+  else if (t.type === 'income' && t.card_id) await bumpAccount(t.card_id, amt, userId);
+  else if (t.type === 'transfer') {
+    if (t.card_id) await bumpAccount(t.card_id, -amt, userId);
+    if (t.to_card_id) await bumpAccount(t.to_card_id, amt, userId);
+  }
+}
 
 // Validate a goal_id belongs to one of the user's spaces; returns its id or null.
 async function resolveGoalId(req, goalId) {
@@ -78,7 +91,7 @@ router.get('/', async (req, res, next) => {
       .from('transactions')
       // Embed the linked card (resolves a partner's card in a shared space) and
       // the linked goal (so savings rows can show "Savings → <goal>").
-      .select('*, card:cards(nickname, last4, color, type), goal:goals(name)')
+      .select('*, card:cards!card_id(nickname, last4, color, type), to_account:cards!to_card_id(nickname), goal:goals(name)')
       .in('space_id', req.spaceIds) // only spaces this user belongs to
       .order('transaction_date', { ascending: false });
 
@@ -116,7 +129,35 @@ router.post('/', async (req, res, next) => {
 
     const value = Math.abs(Number(amount));
     if (!value) throw badRequest('amount must be a non-zero number');
-    if (!TYPES.includes(type)) throw badRequest("type must be 'expense', 'income' or 'savings'");
+    if (!TYPES.includes(type)) throw badRequest("type must be 'expense', 'income', 'savings' or 'transfer'");
+
+    // --- Transfer: move money between two of the user's accounts ---
+    if (type === 'transfer') {
+      const toId = req.body?.to_card_id;
+      if (!card_id || !toId) throw badRequest('a transfer needs a from and a to account');
+      if (card_id === toId) throw badRequest('the from and to accounts must be different');
+      await resolveCard(req, card_id); // validate ownership of both
+      await resolveCard(req, toId);
+      const trow = {
+        amount: value,
+        type: 'transfer',
+        category: 'Transfer',
+        merchant: null,
+        description: description ? String(description).trim() : null,
+        payment_method: null,
+        card_id, // from
+        to_card_id: toId, // to
+        source: 'manual',
+        space_id: targetSpace(req, req.body?.space_id),
+        created_by: req.user.id,
+      };
+      if (transaction_date) trow.transaction_date = new Date(transaction_date).toISOString();
+      const { data, error } = await supabase.from('transactions').insert(trow).select().single();
+      if (error) throw new Error(error.message);
+      await applyBalanceEffect(data, +1, req.user.id);
+      return res.status(201).json(data);
+    }
+
     if (payment_method != null && payment_method !== '' && !PAYMENT_METHODS.includes(payment_method)) {
       throw badRequest(`payment_method must be one of: ${PAYMENT_METHODS.join(', ')}`);
     }
@@ -151,6 +192,8 @@ router.post('/', async (req, res, next) => {
 
     // Linked savings contribute to the goal's progress.
     if (isSavings && goalId) await bumpGoal(goalId, value, req.spaceIds);
+    // Expense/income adjust the linked account's balance.
+    await applyBalanceEffect(data, +1, req.user.id);
 
     res.status(201).json(data);
   } catch (err) {
@@ -217,6 +260,9 @@ router.put('/:id', async (req, res, next) => {
     if (req.body?.goal_id !== undefined) {
       updates.goal_id = req.body.goal_id ? await resolveGoalId(req, req.body.goal_id) : null;
     }
+    if (req.body?.to_card_id !== undefined) {
+      updates.to_card_id = req.body.to_card_id ? (await resolveCard(req, req.body.to_card_id)).id : null;
+    }
     if (req.body?.space_id !== undefined) updates.space_id = targetSpace(req, req.body.space_id);
 
     // Resolve the post-update type; a non-savings entry can't hold a goal/card link.
@@ -245,6 +291,10 @@ router.put('/:id', async (req, res, next) => {
     if (old.type === 'savings' && old.goal_id) await bumpGoal(old.goal_id, -Number(old.amount), req.spaceIds);
     if (data.type === 'savings' && data.goal_id) await bumpGoal(data.goal_id, Number(data.amount), req.spaceIds);
 
+    // Re-sync account balances: reverse the old effect, apply the new one.
+    await applyBalanceEffect(old, -1, req.user.id);
+    await applyBalanceEffect(data, +1, req.user.id);
+
     res.json(data);
   } catch (err) {
     next(err);
@@ -266,6 +316,8 @@ router.delete('/:id', async (req, res, next) => {
 
     // Deleting a linked savings entry removes its contribution from the goal.
     if (data.type === 'savings' && data.goal_id) await bumpGoal(data.goal_id, -Number(data.amount), req.spaceIds);
+    // Reverse its effect on account balances.
+    await applyBalanceEffect(data, -1, req.user.id);
 
     res.json({ deleted: data.id });
   } catch (err) {

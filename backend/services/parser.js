@@ -62,9 +62,14 @@ function buildTransactionSchema(categories) {
         description:
           'For type "savings", the savings goal named in the message matched to the provided goal list (exact name); otherwise an empty string',
       },
+      account_balance: {
+        type: 'string',
+        description:
+          'The account\'s available/remaining balance if the message states one (e.g. "Avl Bal 45,000"), digits only; otherwise an empty string',
+      },
       confidence: { type: 'number', description: 'Confidence in the extraction from 0 to 1' },
     },
-    required: ['amount', 'currency', 'merchant', 'type', 'category', 'payment_method', 'card_last4', 'date', 'goal', 'confidence'],
+    required: ['amount', 'currency', 'merchant', 'type', 'category', 'payment_method', 'card_last4', 'date', 'goal', 'account_balance', 'confidence'],
   };
 }
 
@@ -80,6 +85,7 @@ Rules:
 - payment_method: "credit" if a credit card was used; "debit" for a debit card or a direct account/current/savings debit; "cash" for cash; otherwise "other".
 - card_last4: the last 4 digits of the card or account if the message states them (e.g. "card ending 4521"), otherwise an empty string.
 - date: the date the transaction occurred as stated in the message, in ISO 8601 (YYYY-MM-DD). The message may write it as DD/MM/YYYY, DD-MMM-YY, etc. — convert it. Use the provided current date to fill in a missing year. If no date is stated, use an empty string (do NOT guess today's date).
+- account_balance: the available/remaining account balance if the message states one (look for "Avl Bal", "Available balance", "Bal:", "Balance"); strip currency symbols and separators; otherwise an empty string.
 - confidence: your confidence in the overall extraction, from 0 to 1.
 
 Return only the structured object — no commentary.`;
@@ -108,9 +114,11 @@ function normalize(p, categories) {
   const card_last4 = digits.length === 4 ? digits : null;
   const date = cleanDate(p?.date);
   const goal = (p?.goal && String(p.goal).trim()) || null;
+  const balRaw = String(p?.account_balance ?? '').replace(/[^\d.-]/g, '');
+  const account_balance = balRaw && Number.isFinite(Number(balRaw)) ? Number(balRaw) : null;
   let confidence = Number(p?.confidence);
   if (!(confidence >= 0 && confidence <= 1)) confidence = 0.5;
-  return { amount, currency, merchant, type, category, payment_method, card_last4, date, goal, confidence };
+  return { amount, currency, merchant, type, category, payment_method, card_last4, date, goal, account_balance, confidence };
 }
 
 function chooseProvider() {
@@ -152,7 +160,7 @@ async function parseWithGroq(rawText, categories, today, goals) {
   if (!apiKey) throw new Error('GROQ_API_KEY is not set');
   const model = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
 
-  const jsonInstruction = `Return a JSON object with exactly these keys: amount (number), currency (string), merchant (string), type ("expense", "income" or "savings"), category (one of: ${categories.join(', ')}), payment_method (one of: credit, debit, cash, other), card_last4 (string: the card's last 4 digits, or "" if not stated), date (string: the transaction date as ISO YYYY-MM-DD if the message states one, else ""), goal (string: for savings, the matching goal name, else ""), confidence (number 0-1).`;
+  const jsonInstruction = `Return a JSON object with exactly these keys: amount (number), currency (string), merchant (string), type ("expense", "income" or "savings"), category (one of: ${categories.join(', ')}), payment_method (one of: credit, debit, cash, other), card_last4 (string: the card's last 4 digits, or "" if not stated), date (string: the transaction date as ISO YYYY-MM-DD if the message states one, else ""), goal (string: for savings, the matching goal name, else ""), account_balance (string: the available balance if stated, digits only, else ""), confidence (number 0-1).`;
 
   let res;
   try {

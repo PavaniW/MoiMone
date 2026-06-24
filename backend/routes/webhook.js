@@ -6,6 +6,7 @@ import { userCategoryNames } from '../lib/categories.js';
 import { categoryForMerchant } from '../lib/merchant-rules.js';
 import { toLKR } from '../lib/fx.js';
 import { goalsForSpace, matchGoal, addToGoal } from '../lib/goals.js';
+import { setAccountBalance, bumpAccount } from '../lib/accounts.js';
 
 const router = Router();
 
@@ -74,6 +75,18 @@ router.post('/sms', async (req, res, next) => {
 
     // A linked saving contributes to the goal's progress.
     if (isSavings && goal) await addToGoal(goal.id, amount, who.spaceId);
+
+    // Keep the linked account's balance fresh: the SMS "available balance" is
+    // authoritative; otherwise adjust incrementally by the transaction.
+    if (card) {
+      if (parsed.account_balance != null) {
+        await setAccountBalance(card.id, parsed.account_balance, who.userId);
+      } else if (parsed.type === 'income') {
+        await bumpAccount(card.id, amount, who.userId);
+      } else if (parsed.type === 'expense') {
+        await bumpAccount(card.id, -amount, who.userId);
+      }
+    }
 
     res.status(201).json({ transaction: data, parsed });
   } catch (err) {

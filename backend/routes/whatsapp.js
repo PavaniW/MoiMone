@@ -5,6 +5,7 @@ import { userCategoryNames } from '../lib/categories.js';
 import { categoryForMerchant } from '../lib/merchant-rules.js';
 import { toLKR } from '../lib/fx.js';
 import { goalsForSpace, matchGoal, addToGoal } from '../lib/goals.js';
+import { setAccountBalance, bumpAccount } from '../lib/accounts.js';
 import { supabase } from '../lib/supabase.js';
 import { monthRange, currentPeriod } from '../lib/period.js';
 import { userByWhatsApp, matchUserCard } from '../lib/ingest.js';
@@ -169,6 +170,17 @@ router.post('/whatsapp', authenticate, async (req, res) => {
     if (error) throw new Error(error.message);
 
     const orig = fx ? ` (${fx.currency} ${fx.original})` : '';
+
+    // Keep the linked account's balance fresh (same rule as the SMS webhook).
+    if (card) {
+      if (parsed.account_balance != null) {
+        await setAccountBalance(card.id, parsed.account_balance, who.userId);
+      } else if (parsed.type === 'income') {
+        await bumpAccount(card.id, amount, who.userId);
+      } else if (parsed.type === 'expense') {
+        await bumpAccount(card.id, -amount, who.userId);
+      }
+    }
 
     if (isSavings) {
       if (goal) await addToGoal(goal.id, amount, who.spaceId);
