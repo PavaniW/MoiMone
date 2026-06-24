@@ -42,7 +42,7 @@ function badRequest(message) {
 // Optional query: ?month=&year=, ?limit=, ?category=, ?source=, ?type=, ?space=.
 router.get('/', async (req, res, next) => {
   try {
-    const { month, year, limit, category, source, type, space } = req.query;
+    const { month, year, limit, category, source, type, space, from, to } = req.query;
 
     let query = supabase
       .from('transactions')
@@ -60,6 +60,9 @@ router.get('/', async (req, res, next) => {
       const { start, end } = monthRange(month, year);
       query = query.gte('transaction_date', start).lt('transaction_date', end);
     }
+    // Explicit date-range window (used by the dashboard's 6-month trend).
+    if (from) query = query.gte('transaction_date', from);
+    if (to) query = query.lt('transaction_date', to);
     if (category) query = query.eq('category', category);
     if (source) query = query.eq('source', source);
     if (type) query = query.eq('type', type);
