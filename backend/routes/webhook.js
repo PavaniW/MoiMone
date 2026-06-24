@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase.js';
 import { userByIngestToken, matchUserCard } from '../lib/ingest.js';
 import { userCategoryNames } from '../lib/categories.js';
 import { categoryForMerchant } from '../lib/merchant-rules.js';
+import { toLKR } from '../lib/fx.js';
 
 const router = Router();
 
@@ -35,13 +36,17 @@ router.post('/sms', async (req, res, next) => {
     // Auto-link to one of the user's registered cards by last 4 digits.
     const card = await matchUserCard(who.userId, parsed.card_last4);
 
+    // Convert foreign-currency amounts to LKR (we store everything in LKR).
+    const fx = await toLKR(parsed.amount, parsed.currency);
+
     const { data, error } = await supabase
       .from('transactions')
       .insert({
-        amount: parsed.amount,
+        amount: fx ? fx.lkr : parsed.amount,
         type: parsed.type,
         category: parsed.category,
         merchant: parsed.merchant,
+        description: fx ? `Originally ${fx.currency} ${fx.original}` : null,
         payment_method: card ? card.type : parsed.payment_method,
         card_last4: parsed.card_last4,
         card_id: card ? card.id : null,

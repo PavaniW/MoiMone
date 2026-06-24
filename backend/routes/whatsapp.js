@@ -3,6 +3,7 @@ import twilio from 'twilio';
 import { parseTransaction, DEFAULT_CURRENCY } from '../services/parser.js';
 import { userCategoryNames } from '../lib/categories.js';
 import { categoryForMerchant } from '../lib/merchant-rules.js';
+import { toLKR } from '../lib/fx.js';
 import { supabase } from '../lib/supabase.js';
 import { monthRange, currentPeriod } from '../lib/period.js';
 import { userByWhatsApp, matchUserCard } from '../lib/ingest.js';
@@ -102,11 +103,16 @@ router.post('/whatsapp', authenticate, async (req, res) => {
 
     const card = await matchUserCard(who.userId, parsed.card_last4);
 
+    // Convert foreign-currency amounts to LKR (we store everything in LKR).
+    const fx = await toLKR(parsed.amount, parsed.currency);
+    const amount = fx ? fx.lkr : parsed.amount;
+
     const { error } = await supabase.from('transactions').insert({
-      amount: parsed.amount,
+      amount,
       type: parsed.type,
       category: parsed.category,
       merchant: parsed.merchant,
+      description: fx ? `Originally ${fx.currency} ${fx.original}` : null,
       payment_method: card ? card.type : parsed.payment_method,
       card_last4: parsed.card_last4,
       card_id: card ? card.id : null,
@@ -122,11 +128,12 @@ router.post('/whatsapp', authenticate, async (req, res) => {
     const merchant =
       parsed.merchant && parsed.merchant !== 'Unknown' ? ` (${parsed.merchant})` : '';
     const sign = parsed.type === 'income' ? '+' : '';
+    const orig = fx ? ` (${fx.currency} ${fx.original})` : '';
     const remaining = await budgetRemainingLine(parsed.category, who.spaceId);
 
     reply(
       res,
-      `✅ Logged: ${sign}${parsed.currency} ${parsed.amount} – ${parsed.category}${merchant}.${remaining}`
+      `✅ Logged: ${sign}${DEFAULT_CURRENCY} ${amount}${orig} – ${parsed.category}${merchant}.${remaining}`
     );
   } catch (err) {
     console.error('whatsapp webhook error:', err.message);
