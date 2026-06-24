@@ -2107,3 +2107,16 @@ body {
   gap: 0.5rem;
   margin-top: 0.6rem;
 }
+
+/* Goal: required monthly saving */
+.goal-permonth {
+  margin-top: 0.5rem;
+  font-size: 0.82rem;
+  color: var(--muted);
+  background: var(--bar);
+  border-radius: 6px;
+  padding: 0.4rem 0.6rem;
+}
+.goal-permonth strong {
+  color: var(--green);
+}

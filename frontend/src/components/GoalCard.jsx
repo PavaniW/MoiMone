@@ -24,6 +24,10 @@ export default function GoalCard({ goal, onAddFunds, onEdit, onDelete }) {
   const reached = current >= target;
   const color = goal.color || DEFAULT_COLOR;
   const days = daysLeft(goal.deadline);
+  // Minimum to save per month to hit the target by the deadline.
+  const remaining = Math.max(0, target - current);
+  const monthsLeft = days != null && days > 0 ? Math.max(1, Math.ceil(days / 30.44)) : null;
+  const perMonth = monthsLeft ? remaining / monthsLeft : null;
 
   async function add(e) {
     e.preventDefault();
@@ -139,6 +143,17 @@ export default function GoalCard({ goal, onAddFunds, onEdit, onDelete }) {
               </span>
             )}
           </div>
+
+          {!reached && perMonth != null && (
+            <div className="goal-permonth num">
+              Save <strong>{CURRENCY} {formatAmount(perMonth)}/mo</strong> to reach this by the deadline
+            </div>
+          )}
+          {!reached && perMonth == null && goal.deadline && days != null && days <= 0 && (
+            <div className="goal-permonth">
+              Deadline passed — {CURRENCY} {formatAmount(remaining)} still to go
+            </div>
+          )}
 
           <form className="goal-add" onSubmit={add}>
             <input
