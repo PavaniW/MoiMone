@@ -46,7 +46,9 @@ router.get('/', async (req, res, next) => {
 
     let query = supabase
       .from('transactions')
-      .select('*')
+      // Embed the linked card so it resolves even when it belongs to another
+      // member of a shared space (the viewer doesn't own that card).
+      .select('*, card:cards(nickname, last4, color, type)')
       .in('space_id', req.spaceIds) // only spaces this user belongs to
       .order('transaction_date', { ascending: false });
 

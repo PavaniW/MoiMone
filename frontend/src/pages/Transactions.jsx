@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import AddTransaction from '../components/AddTransaction.jsx';
 import Loading from '../components/Loading.jsx';
 import { formatAmount, formatDay, formatCard, CURRENCY } from '../lib/format.js';
@@ -8,12 +8,11 @@ import { useSpace } from '../space.jsx';
 const FALLBACK_COLOR = '#9A9384';
 const SOURCES = ['sms', 'email', 'whatsapp', 'manual'];
 
-// Label for a transaction's payment: a registered card's name, else raw method.
+// Label for a transaction's payment: the registered card's name (embedded from
+// the API, so a partner's card resolves too; else our own list), else raw method.
 function cardLabel(t, cardsById) {
-  if (t.card_id && cardsById[t.card_id]) {
-    const c = cardsById[t.card_id];
-    return c.last4 ? `${c.nickname} ••${c.last4}` : c.nickname;
-  }
+  const c = t.card || (t.card_id && cardsById[t.card_id]);
+  if (c) return c.last4 ? `${c.nickname} ••${c.last4}` : c.nickname;
   return formatCard(t.payment_method, t.card_last4);
 }
 
@@ -27,7 +26,8 @@ export default function Transactions() {
   const [cards, setCards] = useState([]);
   const [showAdd, setShowAdd] = useState(false);
   const [editing, setEditing] = useState(null); // transaction being edited, or null
-  const { currentSpaceId, currentSpace } = useSpace();
+  const { currentSpaceId, currentSpace, refreshTick } = useSpace();
+  const loadedSpace = useRef(null);
 
   const [q, setQ] = useState('');
   const [category, setCategory] = useState('');
@@ -38,7 +38,8 @@ export default function Transactions() {
   useEffect(() => {
     if (!currentSpaceId) return; // wait for the active space
     let active = true;
-    setStatus('loading');
+    if (loadedSpace.current !== currentSpaceId) setStatus('loading');
+    loadedSpace.current = currentSpaceId;
     (async () => {
       try {
         const [txns, cats, cds] = await Promise.all([
@@ -62,7 +63,7 @@ export default function Transactions() {
     return () => {
       active = false;
     };
-  }, [currentSpaceId]);
+  }, [currentSpaceId, refreshTick]);
 
   // For shared spaces: map a member's user id → display name ("You" for self).
   const memberName = useMemo(

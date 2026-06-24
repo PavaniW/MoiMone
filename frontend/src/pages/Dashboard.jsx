@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Loading from '../components/Loading.jsx';
 import SpendingChart from '../components/SpendingChart.jsx';
 import BudgetBar from '../components/BudgetBar.jsx';
@@ -35,12 +35,13 @@ function build(categories, cards, monthTxns, recentTxns, budgetRows) {
       byCategory[t.category] = (byCategory[t.category] || 0) + amount;
 
       // Group by registered card when linked, else by raw method/last4.
+      // Prefer the API-embedded card so a shared-space partner's card resolves.
       let key;
       let label;
-      if (t.card_id && cardsById[t.card_id]) {
-        const c = cardsById[t.card_id];
+      const linkedCard = t.card || (t.card_id && cardsById[t.card_id]);
+      if (linkedCard) {
         key = t.card_id;
-        label = c.last4 ? `${c.nickname} ••${c.last4}` : c.nickname;
+        label = linkedCard.last4 ? `${linkedCard.nickname} ••${linkedCard.last4}` : linkedCard.nickname;
       } else if (t.payment_method) {
         key = cardKey(t.payment_method, t.card_last4);
         label = formatCard(t.payment_method, t.card_last4);
@@ -78,12 +79,15 @@ function build(categories, cards, monthTxns, recentTxns, budgetRows) {
 // Page 1 — Dashboard, styled as a personal statement. Live data via the backend API.
 export default function Dashboard() {
   const [state, setState] = useState({ status: 'loading' });
-  const { currentSpaceId } = useSpace();
+  const { currentSpaceId, refreshTick } = useSpace();
+  const loadedSpace = useRef(null);
 
   useEffect(() => {
     if (!currentSpaceId) return; // wait until the active space is known
     let active = true;
-    setState({ status: 'loading' });
+    // Show the loader only on a space switch; focus-refreshes stay silent.
+    if (loadedSpace.current !== currentSpaceId) setState({ status: 'loading' });
+    loadedSpace.current = currentSpaceId;
     (async () => {
       try {
         const sp = `&space=${currentSpaceId}`;
@@ -104,7 +108,7 @@ export default function Dashboard() {
     return () => {
       active = false;
     };
-  }, [currentSpaceId]);
+  }, [currentSpaceId, refreshTick]);
 
   if (state.status === 'loading') {
     return <Loading label="Loading your statement…" />;

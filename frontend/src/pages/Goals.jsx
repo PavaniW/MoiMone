@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import GoalCard from '../components/GoalCard.jsx';
 import Loading, { Spinner } from '../components/Loading.jsx';
 import { CURRENCY } from '../lib/format.js';
@@ -17,12 +17,14 @@ export default function Goals() {
 
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
-  const { currentSpaceId } = useSpace();
+  const { currentSpaceId, refreshTick } = useSpace();
+  const loadedSpace = useRef(null);
 
   useEffect(() => {
     if (!currentSpaceId) return; // wait for the active space
     let active = true;
-    setStatus('loading');
+    if (loadedSpace.current !== currentSpaceId) setStatus('loading');
+    loadedSpace.current = currentSpaceId;
     (async () => {
       try {
         const data = await api.getGoals(`?space=${currentSpaceId}`);
@@ -40,7 +42,7 @@ export default function Goals() {
     return () => {
       active = false;
     };
-  }, [currentSpaceId]);
+  }, [currentSpaceId, refreshTick]);
 
   const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
 

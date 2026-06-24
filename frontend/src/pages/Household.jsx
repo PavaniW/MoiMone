@@ -39,6 +39,22 @@ function SharedSpace({ space, onChange }) {
     }
   }
 
+  async function deleteSpace() {
+    if (
+      !window.confirm(
+        `Delete "${space.name}" and ALL its transactions, budgets and goals? This can't be undone.`
+      )
+    )
+      return;
+    setError(null);
+    try {
+      await api.deleteSpace(space.id);
+      await onChange(); // refresh() resets the active space if this was it
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
   return (
     <div className="panel" style={{ marginTop: '1.25rem' }}>
       <div className="panel-head">
@@ -91,6 +107,15 @@ function SharedSpace({ space, onChange }) {
           {error && <p className="form-error">{error}</p>}
           <p className="setup-note">Only the owner can add or remove members.</p>
         </>
+      )}
+
+      {space.isOwner && (
+        <div className="space-danger">
+          <button type="button" className="btn-danger" onClick={deleteSpace}>
+            Delete space
+          </button>
+          <span className="setup-note">Removes the space and everything in it.</span>
+        </div>
       )}
     </div>
   );

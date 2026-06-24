@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import BudgetBar from '../components/BudgetBar.jsx';
 import Loading, { Spinner } from '../components/Loading.jsx';
 import { formatAmount, CURRENCY } from '../lib/format.js';
@@ -25,7 +25,8 @@ export default function Budgets() {
   const [category, setCategory] = useState('');
   const [limit, setLimit] = useState('');
   const [saving, setSaving] = useState(false);
-  const { currentSpaceId } = useSpace();
+  const { currentSpaceId, refreshTick } = useSpace();
+  const loadedSpace = useRef(null);
 
   async function load() {
     const sp = `&space=${currentSpaceId}`;
@@ -38,7 +39,8 @@ export default function Budgets() {
   useEffect(() => {
     if (!currentSpaceId) return; // wait for the active space
     let active = true;
-    setStatus('loading');
+    if (loadedSpace.current !== currentSpaceId) setStatus('loading');
+    loadedSpace.current = currentSpaceId;
     (async () => {
       try {
         await load();
@@ -54,7 +56,7 @@ export default function Budgets() {
       active = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentSpaceId]);
+  }, [currentSpaceId, refreshTick]);
 
   const colorOf = useMemo(
     () => Object.fromEntries(categories.map((c) => [c.name, c.color])),

@@ -11,6 +11,9 @@ export function SpaceProvider({ children }) {
   const [spaces, setSpaces] = useState([]);
   const [currentSpaceId, setCurrentSpaceId] = useState(null);
   const [loading, setLoading] = useState(true);
+  // Bumped when the tab regains focus, so data pages re-fetch — a lightweight
+  // "live sync" for shared spaces (a partner's changes show on return).
+  const [refreshTick, setRefreshTick] = useState(0);
 
   const refresh = useCallback(async () => {
     const list = await api.getSpaces();
@@ -37,6 +40,18 @@ export function SpaceProvider({ children }) {
     };
   }, [refresh]);
 
+  useEffect(() => {
+    const bump = () => {
+      if (document.visibilityState === 'visible') setRefreshTick((n) => n + 1);
+    };
+    document.addEventListener('visibilitychange', bump);
+    window.addEventListener('focus', bump);
+    return () => {
+      document.removeEventListener('visibilitychange', bump);
+      window.removeEventListener('focus', bump);
+    };
+  }, []);
+
   const selectSpace = useCallback((id) => {
     setCurrentSpaceId(id);
     if (id) localStorage.setItem(STORAGE_KEY, id);
@@ -46,7 +61,7 @@ export function SpaceProvider({ children }) {
 
   return (
     <SpaceContext.Provider
-      value={{ spaces, currentSpaceId, currentSpace, selectSpace, refresh, loading }}
+      value={{ spaces, currentSpaceId, currentSpace, selectSpace, refresh, loading, refreshTick }}
     >
       {children}
     </SpaceContext.Provider>

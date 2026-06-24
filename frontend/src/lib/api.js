@@ -48,6 +48,7 @@ export const api = {
     request(`/api/spaces/${spaceId}/members`, { method: 'POST', body: JSON.stringify({ email }) }),
   removeSpaceMember: (spaceId, userId) =>
     request(`/api/spaces/${spaceId}/members/${userId}`, { method: 'DELETE' }),
+  deleteSpace: (spaceId) => request(`/api/spaces/${spaceId}`, { method: 'DELETE' }),
 
   // Transactions
   getTransactions: (params = '') => request(`/api/transactions${params}`),

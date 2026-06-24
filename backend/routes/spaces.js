@@ -172,4 +172,35 @@ router.delete('/:id/members/:userId', async (req, res, next) => {
   }
 });
 
+// DELETE /api/spaces/:id — owner deletes a shared space AND everything in it.
+// (space_id has no ON DELETE CASCADE on the data tables, so remove child rows
+// first; space_members cascades when the space row is deleted.)
+router.delete('/:id', async (req, res, next) => {
+  try {
+    const spaceId = req.params.id;
+    if (!req.spaceIds.includes(spaceId)) throw badRequest('not your space');
+
+    const { data: space, error: sErr } = await supabase
+      .from('spaces')
+      .select('kind, created_by')
+      .eq('id', spaceId)
+      .maybeSingle();
+    if (sErr) throw new Error(sErr.message);
+    if (!space) throw badRequest('space not found');
+    if (space.kind === 'personal') throw badRequest("you can't delete your personal space");
+    if (space.created_by !== req.user.id) throw badRequest('only the owner can delete this space');
+
+    for (const table of ['transactions', 'budgets', 'goals']) {
+      const { error } = await supabase.from(table).delete().eq('space_id', spaceId);
+      if (error) throw new Error(error.message);
+    }
+    const { error: delErr } = await supabase.from('spaces').delete().eq('id', spaceId);
+    if (delErr) throw new Error(delErr.message);
+
+    res.json({ deleted: spaceId });
+  } catch (err) {
+    next(err);
+  }
+});
+
 export default router;

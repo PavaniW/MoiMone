@@ -1622,3 +1622,29 @@ body {
     display: none;
   }
 }
+
+/* ---------- Delete shared space ---------- */
+.space-danger {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  margin-top: 1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+.btn-danger {
+  font-family: var(--display);
+  background: none;
+  border: 1px solid var(--sienna);
+  color: var(--sienna);
+  border-radius: 8px;
+  padding: 0.5rem 0.9rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-danger:hover {
+  background: var(--sienna);
+  color: #fff;
+}
