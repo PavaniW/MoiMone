@@ -36,8 +36,9 @@ export default function Transactions() {
   const [card, setCard] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [needsReview, setNeedsReview] = useState(false);
 
-  const hasFilters = Boolean(q || category || source || type || card || dateFrom || dateTo);
+  const hasFilters = Boolean(q || category || source || type || card || dateFrom || dateTo || needsReview);
   function resetFilters() {
     setQ('');
     setCategory('');
@@ -46,7 +47,11 @@ export default function Transactions() {
     setCard('');
     setDateFrom('');
     setDateTo('');
+    setNeedsReview(false);
   }
+
+  // Auto-imported (not manual) entries the parser couldn't categorize → "Other".
+  const isReview = (t) => t.source !== 'manual' && t.category === 'Other';
 
   useEffect(() => {
     if (!currentSpaceId) return; // wait for the active space
@@ -110,13 +115,16 @@ export default function Transactions() {
         if (dateFrom && d < dateFrom) return false;
         if (dateTo && d > dateTo) return false;
       }
+      if (needsReview && !isReview(t)) return false;
       if (needle) {
         const hay = `${t.merchant || ''} ${t.description || ''} ${t.category}`.toLowerCase();
         if (!hay.includes(needle)) return false;
       }
       return true;
     });
-  }, [rows, q, category, source, type, card, dateFrom, dateTo]);
+  }, [rows, q, category, source, type, card, dateFrom, dateTo, needsReview]);
+
+  const reviewCount = useMemo(() => rows.filter(isReview).length, [rows]);
 
   const total = useMemo(
     () => filtered.reduce((sum, t) => sum + (t.type === 'income' ? 1 : -1) * Number(t.amount), 0),
@@ -192,6 +200,17 @@ export default function Transactions() {
             onCreated={handleCreated}
           />
         </div>
+      )}
+
+      {reviewCount > 0 && (
+        <button
+          type="button"
+          className={`review-toggle ${needsReview ? 'active' : ''}`}
+          onClick={() => setNeedsReview((v) => !v)}
+        >
+          ⚠ {reviewCount} to review
+          <span className="review-hint">{needsReview ? '— showing' : '— uncategorized imports'}</span>
+        </button>
       )}
 
       {/* Filters */}

@@ -1820,3 +1820,30 @@ body {
   color: var(--muted);
   font-family: var(--mono);
 }
+
+/* ---------- "Needs review" toggle ---------- */
+.review-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 1rem 0 0;
+  padding: 0.45rem 0.85rem;
+  border: 1px solid #e3c9a0;
+  background: #fbf3e3;
+  color: #8a6d3b;
+  border-radius: 999px;
+  font-family: var(--display);
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.review-toggle.active {
+  border-color: var(--sienna);
+  background: var(--sienna);
+  color: #fff;
+}
+.review-hint {
+  font-weight: 400;
+  opacity: 0.8;
+  font-size: 0.78rem;
+}
