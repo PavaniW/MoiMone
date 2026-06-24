@@ -128,18 +128,14 @@ export default function Transactions() {
   }, [rows, q, category, source, type, card, dateFrom, dateTo, needsReview]);
 
   const reviewCount = useMemo(() => rows.filter(isReview).length, [rows]);
-  const savedTotal = useMemo(
-    () => filtered.filter((t) => t.type === 'savings').reduce((s, t) => s + Number(t.amount), 0),
-    [filtered]
-  );
 
-  // Net = income − expense; savings is set-aside money, not part of the net.
+  // Net = what's left in hand: income − expense − savings (savings is money
+  // moved out of spendable cash, so it reduces the net too).
   const total = useMemo(
     () =>
       filtered.reduce((sum, t) => {
         if (t.type === 'income') return sum + Number(t.amount);
-        if (t.type === 'expense') return sum - Number(t.amount);
-        return sum;
+        return sum - Number(t.amount); // expense and savings both reduce it
       }, 0),
     [filtered]
   );
@@ -292,8 +288,7 @@ export default function Transactions() {
             {filtered.length} {filtered.length === 1 ? 'entry' : 'entries'}
           </h3>
           <span className="panel-note">
-            net {total >= 0 ? '+' : '−'} {CURRENCY} {formatAmount(total)}
-            {savedTotal > 0 && ` · saved ${CURRENCY} ${formatAmount(savedTotal)}`}
+            net {total >= 0 ? '+' : '−'} {CURRENCY} {formatAmount(Math.abs(total))}
           </span>
         </div>
 
