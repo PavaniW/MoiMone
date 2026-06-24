@@ -815,6 +815,11 @@ body {
   border: 1px solid var(--line);
   border-radius: 5px;
   padding: 0.5rem 0.65rem;
+  width: 100%;
+}
+/* Date inputs render small/intrinsic by default — make them fill + tappable. */
+.field-input[type='date'] {
+  min-height: 38px;
 }
 
 .field-input:focus {
@@ -1994,4 +1999,33 @@ body {
 /* Smaller, tidier merchant text in the ledger */
 .ledger-merchant {
   font-size: 0.85rem;
+}
+
+/* Pie chart: kill the mobile tap-highlight / focus outline on sectors */
+.pie-canvas,
+.recharts-wrapper,
+.recharts-surface {
+  -webkit-tap-highlight-color: transparent;
+}
+.recharts-sector:focus,
+.recharts-surface:focus,
+.pie-canvas svg:focus,
+.pie-canvas path:focus {
+  outline: none;
+}
+
+/* Masthead eyebrow shouldn't wrap (e.g. "Personal Statement") */
+.stmt-eyebrow {
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  /* Let the month nav drop below the title instead of squeezing it onto 2 lines */
+  .stmt-head {
+    flex-wrap: wrap;
+    gap: 0.5rem 0.75rem;
+  }
+  .field-input[type='date'] {
+    font-size: 1rem;
+  }
 }
