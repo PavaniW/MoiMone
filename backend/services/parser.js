@@ -41,7 +41,7 @@ function buildTransactionSchema(categories) {
       amount: { type: 'number', description: 'Transaction amount as a positive number' },
       currency: { type: 'string', description: 'Currency code, e.g. LKR, SAR, USD' },
       merchant: { type: 'string', description: 'Merchant or payee name; "Unknown" if not stated' },
-      type: { type: 'string', enum: ['expense', 'income'] },
+      type: { type: 'string', enum: ['expense', 'income', 'savings'] },
       category: { type: 'string', enum: categories },
       payment_method: {
         type: 'string',
@@ -57,9 +57,14 @@ function buildTransactionSchema(categories) {
         description:
           'The date the transaction occurred, in ISO 8601 (YYYY-MM-DD), if the message states one; otherwise an empty string',
       },
+      goal: {
+        type: 'string',
+        description:
+          'For type "savings", the savings goal named in the message matched to the provided goal list (exact name); otherwise an empty string',
+      },
       confidence: { type: 'number', description: 'Confidence in the extraction from 0 to 1' },
     },
-    required: ['amount', 'currency', 'merchant', 'type', 'category', 'payment_method', 'card_last4', 'date', 'confidence'],
+    required: ['amount', 'currency', 'merchant', 'type', 'category', 'payment_method', 'card_last4', 'date', 'goal', 'confidence'],
   };
 }
 
@@ -69,8 +74,9 @@ Rules:
 - amount: the transaction amount as a positive number (no currency symbol, no thousands separators).
 - currency: the currency code if stated (e.g. LKR, SAR, USD); otherwise default to ${DEFAULT_CURRENCY}.
 - merchant: the merchant or payee name. If none is stated, use "Unknown".
-- type: "income" for money received (salary, refund, deposit, credit); "expense" for money spent (purchase, payment, withdrawal, debit, charge).
+- type: "income" for money received (salary, refund, deposit, credit); "expense" for money spent (purchase, payment, withdrawal, debit, charge); "savings" when the message is about setting money aside / saving (e.g. "save 20000 for wedding", "set aside 5000 for emergency", "put away 10k"). Savings is money put away, not spending.
 - category: choose the single best fit from the allowed list. Use "Salary" only for clear salary/payroll income. Use "Other" when nothing fits.
+- goal: only for type "savings" — if the message names a goal that matches one of the provided savings goals, return that goal's exact name; otherwise an empty string.
 - payment_method: "credit" if a credit card was used; "debit" for a debit card or a direct account/current/savings debit; "cash" for cash; otherwise "other".
 - card_last4: the last 4 digits of the card or account if the message states them (e.g. "card ending 4521"), otherwise an empty string.
 - date: the date the transaction occurred as stated in the message, in ISO 8601 (YYYY-MM-DD). The message may write it as DD/MM/YYYY, DD-MMM-YY, etc. — convert it. Use the provided current date to fill in a missing year. If no date is stated, use an empty string (do NOT guess today's date).
@@ -93,7 +99,7 @@ function cleanDate(value) {
 // `categories` is the list considered valid; anything else falls back to "Other".
 function normalize(p, categories) {
   const amount = Math.abs(Number(p?.amount)) || 0;
-  const type = p?.type === 'income' ? 'income' : 'expense';
+  const type = p?.type === 'income' ? 'income' : p?.type === 'savings' ? 'savings' : 'expense';
   const category = categories.includes(p?.category) ? p.category : 'Other';
   const merchant = (p?.merchant && String(p.merchant).trim()) || 'Unknown';
   const currency = (p?.currency && String(p.currency).trim()) || DEFAULT_CURRENCY;
@@ -101,9 +107,10 @@ function normalize(p, categories) {
   const digits = String(p?.card_last4 ?? '').replace(/\D/g, '');
   const card_last4 = digits.length === 4 ? digits : null;
   const date = cleanDate(p?.date);
+  const goal = (p?.goal && String(p.goal).trim()) || null;
   let confidence = Number(p?.confidence);
   if (!(confidence >= 0 && confidence <= 1)) confidence = 0.5;
-  return { amount, currency, merchant, type, category, payment_method, card_last4, date, confidence };
+  return { amount, currency, merchant, type, category, payment_method, card_last4, date, goal, confidence };
 }
 
 function chooseProvider() {
@@ -114,16 +121,23 @@ function chooseProvider() {
   return 'ollama';
 }
 
+// Context line prepended to the message: today's date + the user's savings
+// goals (so the model can resolve partial dates and match a savings goal).
+function preamble(today, goals) {
+  const g = goals && goals.length ? ` The user's savings goals: ${goals.join(', ')}.` : '';
+  return `Today is ${today}.${g}`;
+}
+
 // --- Claude provider ---
 let anthropic;
-async function parseWithClaude(rawText, categories, today) {
+async function parseWithClaude(rawText, categories, today, goals) {
   if (!anthropic) anthropic = new Anthropic();
   const response = await anthropic.messages.create({
     model: CLAUDE_MODEL,
     max_tokens: 1024,
     thinking: { type: 'disabled' },
     system: SYSTEM_PROMPT,
-    messages: [{ role: 'user', content: `Today is ${today}.\n\n${rawText}` }],
+    messages: [{ role: 'user', content: `${preamble(today, goals)}\n\n${rawText}` }],
     output_config: { format: { type: 'json_schema', schema: buildTransactionSchema(categories) } },
   });
   if (response.stop_reason === 'refusal') throw new Error('model refused to parse the message');
@@ -133,12 +147,12 @@ async function parseWithClaude(rawText, categories, today) {
 }
 
 // --- Groq provider (free hosted, OpenAI-compatible) ---
-async function parseWithGroq(rawText, categories, today) {
+async function parseWithGroq(rawText, categories, today, goals) {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) throw new Error('GROQ_API_KEY is not set');
   const model = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
 
-  const jsonInstruction = `Return a JSON object with exactly these keys: amount (number), currency (string), merchant (string), type ("expense" or "income"), category (one of: ${categories.join(', ')}), payment_method (one of: credit, debit, cash, other), card_last4 (string: the card's last 4 digits, or "" if not stated), date (string: the transaction date as ISO YYYY-MM-DD if the message states one, else ""), confidence (number 0-1).`;
+  const jsonInstruction = `Return a JSON object with exactly these keys: amount (number), currency (string), merchant (string), type ("expense", "income" or "savings"), category (one of: ${categories.join(', ')}), payment_method (one of: credit, debit, cash, other), card_last4 (string: the card's last 4 digits, or "" if not stated), date (string: the transaction date as ISO YYYY-MM-DD if the message states one, else ""), goal (string: for savings, the matching goal name, else ""), confidence (number 0-1).`;
 
   let res;
   try {
@@ -151,7 +165,7 @@ async function parseWithGroq(rawText, categories, today) {
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: `${SYSTEM_PROMPT}\n\n${jsonInstruction}` },
-          { role: 'user', content: `Today is ${today}.\n\n${rawText}` },
+          { role: 'user', content: `${preamble(today, goals)}\n\n${rawText}` },
         ],
       }),
     });
@@ -169,7 +183,7 @@ async function parseWithGroq(rawText, categories, today) {
 }
 
 // --- Ollama provider (local, free) ---
-async function parseWithOllama(rawText, categories, today) {
+async function parseWithOllama(rawText, categories, today, goals) {
   const base = process.env.OLLAMA_URL || 'http://localhost:11434';
   const model = process.env.OLLAMA_MODEL || 'llama3.2';
 
@@ -185,7 +199,7 @@ async function parseWithOllama(rawText, categories, today) {
         options: { temperature: 0 },
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: `Today is ${today}.\n\n${rawText}` },
+          { role: 'user', content: `${preamble(today, goals)}\n\n${rawText}` },
         ],
       }),
     });
@@ -206,21 +220,23 @@ async function parseWithOllama(rawText, categories, today) {
 /**
  * Parse a raw message into a structured transaction.
  * @param {string} rawText
- * @param {{categories?: string[]}} [options] - categories restricts the valid
- *   category set (e.g. a user's own list). Falls back to the built-in defaults.
- * @returns {Promise<{amount:number,currency:string,merchant:string,type:'expense'|'income',category:string,payment_method:'credit'|'debit'|'cash'|'other',card_last4:string|null,confidence:number}>}
+ * @param {{categories?: string[], goals?: string[]}} [options] - categories
+ *   restricts the valid category set; goals are the user's savings goal names
+ *   (so the model can match a "save X for Y" message). Both fall back sensibly.
+ * @returns {Promise<{amount:number,currency:string,merchant:string,type:'expense'|'income'|'savings',category:string,payment_method:'credit'|'debit'|'cash'|'other',card_last4:string|null,date:string|null,goal:string|null,confidence:number}>}
  */
-export async function parseTransaction(rawText, { categories } = {}) {
+export async function parseTransaction(rawText, { categories, goals } = {}) {
   if (!rawText || !rawText.trim()) {
     throw new Error('parseTransaction: rawText is empty');
   }
   const allowed = Array.isArray(categories) && categories.length ? categories : CATEGORIES;
+  const goalNames = Array.isArray(goals) ? goals : [];
   const today = new Date().toISOString().slice(0, 10);
   const provider = chooseProvider();
   let raw;
-  if (provider === 'ollama') raw = await parseWithOllama(rawText, allowed, today);
-  else if (provider === 'groq') raw = await parseWithGroq(rawText, allowed, today);
-  else if (provider === 'claude') raw = await parseWithClaude(rawText, allowed, today);
+  if (provider === 'ollama') raw = await parseWithOllama(rawText, allowed, today, goalNames);
+  else if (provider === 'groq') raw = await parseWithGroq(rawText, allowed, today, goalNames);
+  else if (provider === 'claude') raw = await parseWithClaude(rawText, allowed, today, goalNames);
   else throw new Error(`Unknown PARSER_PROVIDER "${provider}" (use "ollama", "groq", or "claude")`);
   return normalize(raw, allowed);
 }

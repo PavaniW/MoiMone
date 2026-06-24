@@ -4,6 +4,7 @@ import { parseTransaction, DEFAULT_CURRENCY } from '../services/parser.js';
 import { userCategoryNames } from '../lib/categories.js';
 import { categoryForMerchant } from '../lib/merchant-rules.js';
 import { toLKR } from '../lib/fx.js';
+import { goalsForSpace, matchGoal, addToGoal } from '../lib/goals.js';
 import { supabase } from '../lib/supabase.js';
 import { monthRange, currentPeriod } from '../lib/period.js';
 import { userByWhatsApp, matchUserCard } from '../lib/ingest.js';
@@ -129,13 +130,20 @@ router.post('/whatsapp', authenticate, async (req, res) => {
     }
 
     const categories = await userCategoryNames(who.userId);
-    const parsed = await parseTransaction(body, { categories });
+    const goals = await goalsForSpace(who.spaceId);
+    const parsed = await parseTransaction(body, { categories, goals: goals.map((g) => g.name) });
 
-    // Learned merchant rule overrides the LLM's category guess, if any.
-    const learned = await categoryForMerchant(who.userId, parsed.merchant);
-    if (learned) parsed.category = learned;
+    const isSavings = parsed.type === 'savings';
+    const goal = isSavings ? matchGoal(goals, parsed.goal) : null;
 
-    const card = await matchUserCard(who.userId, parsed.card_last4);
+    // Learned merchant rule overrides the LLM's category guess (non-savings only).
+    let category = parsed.category;
+    if (!isSavings) {
+      const learned = await categoryForMerchant(who.userId, parsed.merchant);
+      if (learned) category = learned;
+    }
+
+    const card = isSavings ? null : await matchUserCard(who.userId, parsed.card_last4);
 
     // Convert foreign-currency amounts to LKR (we store everything in LKR).
     const fx = await toLKR(parsed.amount, parsed.currency);
@@ -144,12 +152,13 @@ router.post('/whatsapp', authenticate, async (req, res) => {
     const { error } = await supabase.from('transactions').insert({
       amount,
       type: parsed.type,
-      category: parsed.category,
-      merchant: parsed.merchant,
+      category: isSavings ? 'Savings' : category,
+      merchant: isSavings ? null : parsed.merchant,
       description: fx ? `Originally ${fx.currency} ${fx.original}` : null,
-      payment_method: card ? card.type : parsed.payment_method,
-      card_last4: parsed.card_last4,
-      card_id: card ? card.id : null,
+      payment_method: isSavings ? null : card ? card.type : parsed.payment_method,
+      card_last4: isSavings ? null : parsed.card_last4,
+      card_id: isSavings ? null : card ? card.id : null,
+      goal_id: isSavings ? (goal ? goal.id : null) : null,
       source: 'whatsapp',
       raw_text: body,
       created_by: who.userId,
@@ -159,15 +168,22 @@ router.post('/whatsapp', authenticate, async (req, res) => {
     });
     if (error) throw new Error(error.message);
 
+    const orig = fx ? ` (${fx.currency} ${fx.original})` : '';
+
+    if (isSavings) {
+      if (goal) await addToGoal(goal.id, amount, who.spaceId);
+      const toGoal = goal ? ` toward ${goal.name}` : '';
+      return reply(res, `💰 Saved ${DEFAULT_CURRENCY} ${amount}${orig}${toGoal}.`);
+    }
+
     const merchant =
       parsed.merchant && parsed.merchant !== 'Unknown' ? ` (${parsed.merchant})` : '';
     const sign = parsed.type === 'income' ? '+' : '';
-    const orig = fx ? ` (${fx.currency} ${fx.original})` : '';
-    const remaining = await budgetRemainingLine(parsed.category, who.spaceId);
+    const remaining = await budgetRemainingLine(category, who.spaceId);
 
     reply(
       res,
-      `✅ Logged: ${sign}${DEFAULT_CURRENCY} ${amount}${orig} – ${parsed.category}${merchant}.${remaining}`
+      `✅ Logged: ${sign}${DEFAULT_CURRENCY} ${amount}${orig} – ${category}${merchant}.${remaining}`
     );
   } catch (err) {
     console.error('whatsapp webhook error:', err.message);

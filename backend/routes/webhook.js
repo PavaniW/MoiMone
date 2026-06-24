@@ -5,6 +5,7 @@ import { userByIngestToken, matchUserCard } from '../lib/ingest.js';
 import { userCategoryNames } from '../lib/categories.js';
 import { categoryForMerchant } from '../lib/merchant-rules.js';
 import { toLKR } from '../lib/fx.js';
+import { goalsForSpace, matchGoal, addToGoal } from '../lib/goals.js';
 
 const router = Router();
 
@@ -27,29 +28,38 @@ router.post('/sms', async (req, res, next) => {
     if (!who) return res.status(401).json({ error: 'Invalid or missing ingest token' });
 
     const categories = await userCategoryNames(who.userId);
-    const parsed = await parseTransaction(text, { categories });
+    const goals = await goalsForSpace(who.spaceId);
+    const parsed = await parseTransaction(text, { categories, goals: goals.map((g) => g.name) });
 
-    // Learned merchant rule overrides the LLM's category guess, if any.
-    const learned = await categoryForMerchant(who.userId, parsed.merchant);
-    if (learned) parsed.category = learned;
+    const isSavings = parsed.type === 'savings';
+    const goal = isSavings ? matchGoal(goals, parsed.goal) : null;
+
+    // Learned merchant rule overrides the LLM's category guess (non-savings only).
+    let category = parsed.category;
+    if (!isSavings) {
+      const learned = await categoryForMerchant(who.userId, parsed.merchant);
+      if (learned) category = learned;
+    }
 
     // Auto-link to one of the user's registered cards by last 4 digits.
-    const card = await matchUserCard(who.userId, parsed.card_last4);
+    const card = isSavings ? null : await matchUserCard(who.userId, parsed.card_last4);
 
     // Convert foreign-currency amounts to LKR (we store everything in LKR).
     const fx = await toLKR(parsed.amount, parsed.currency);
+    const amount = fx ? fx.lkr : parsed.amount;
 
     const { data, error } = await supabase
       .from('transactions')
       .insert({
-        amount: fx ? fx.lkr : parsed.amount,
+        amount,
         type: parsed.type,
-        category: parsed.category,
-        merchant: parsed.merchant,
+        category: isSavings ? 'Savings' : category,
+        merchant: isSavings ? null : parsed.merchant,
         description: fx ? `Originally ${fx.currency} ${fx.original}` : null,
-        payment_method: card ? card.type : parsed.payment_method,
-        card_last4: parsed.card_last4,
-        card_id: card ? card.id : null,
+        payment_method: isSavings ? null : card ? card.type : parsed.payment_method,
+        card_last4: isSavings ? null : parsed.card_last4,
+        card_id: isSavings ? null : card ? card.id : null,
+        goal_id: isSavings ? (goal ? goal.id : null) : null,
         source: 'sms',
         raw_text: text,
         created_by: who.userId,
@@ -61,6 +71,9 @@ router.post('/sms', async (req, res, next) => {
       .single();
 
     if (error) throw new Error(`Supabase insert failed: ${error.message}`);
+
+    // A linked saving contributes to the goal's progress.
+    if (isSavings && goal) await addToGoal(goal.id, amount, who.spaceId);
 
     res.status(201).json({ transaction: data, parsed });
   } catch (err) {
