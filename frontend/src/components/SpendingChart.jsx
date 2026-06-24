@@ -1,48 +1,54 @@
-import {
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  Cell,
-  XAxis,
-  YAxis,
-  LabelList,
-} from 'recharts';
-import { formatAmount } from '../lib/format.js';
+import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
+import { formatAmount, CURRENCY } from '../lib/format.js';
 
-// Ranked horizontal bars — "where the money went". One bar per category,
-// colored by the category, with the amount printed at the bar's end.
+// "Where the money went" — a donut by category with a legend + center total.
 export default function SpendingChart({ data }) {
+  const total = data.reduce((s, d) => s + d.amount, 0);
+
   return (
-    <div className="chart-wrap">
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart
-          layout="vertical"
-          data={data}
-          margin={{ top: 0, right: 64, bottom: 0, left: 8 }}
-          barCategoryGap={10}
-        >
-          <XAxis type="number" hide />
-          <YAxis
-            type="category"
-            dataKey="category"
-            axisLine={false}
-            tickLine={false}
-            width={108}
-            tick={{ className: 'axis-label' }}
-          />
-          <Bar dataKey="amount" radius={[2, 2, 2, 2]} isAnimationActive={false}>
-            {data.map((row) => (
-              <Cell key={row.category} fill={row.color} />
-            ))}
-            <LabelList
+    <div className="pie-chart">
+      <div className="pie-canvas">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={data}
               dataKey="amount"
-              position="right"
-              className="bar-amount"
-              formatter={(v) => formatAmount(v)}
+              nameKey="category"
+              cx="50%"
+              cy="50%"
+              innerRadius="62%"
+              outerRadius="92%"
+              paddingAngle={1}
+              stroke="none"
+              isAnimationActive={false}
+            >
+              {data.map((row) => (
+                <Cell key={row.category} fill={row.color} />
+              ))}
+            </Pie>
+            <Tooltip
+              formatter={(v, n) => [`${CURRENCY} ${formatAmount(v)}`, n]}
+              contentStyle={{ fontSize: '0.8rem', borderRadius: 8, border: '1px solid var(--line)' }}
             />
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
+          </PieChart>
+        </ResponsiveContainer>
+        <div className="pie-center">
+          <span className="pie-center-label">total</span>
+          <span className="pie-center-value num">
+            {CURRENCY} {formatAmount(total)}
+          </span>
+        </div>
+      </div>
+
+      <ul className="pie-legend">
+        {data.map((d) => (
+          <li key={d.category}>
+            <span className="pie-dot" style={{ background: d.color }} />
+            <span className="pie-cat">{d.category}</span>
+            <span className="pie-amt num">{formatAmount(d.amount)}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

@@ -1927,3 +1927,71 @@ body {
     margin-right: 0.2rem;
   }
 }
+
+/* ---------- Spending donut (Where It Went) ---------- */
+.pie-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+.pie-canvas {
+  position: relative;
+  height: 180px;
+}
+.pie-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.pie-center-label {
+  font-family: var(--mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.pie-center-value {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+.pie-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+.pie-legend li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+.pie-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.pie-cat {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink);
+}
+.pie-amt {
+  color: var(--muted);
+}
+
+/* Smaller, tidier merchant text in the ledger */
+.ledger-merchant {
+  font-size: 0.85rem;
+}
