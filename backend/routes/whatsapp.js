@@ -84,17 +84,23 @@ async function weeklySummaryLine(spaceId) {
     .gte('transaction_date', since);
 
   let spent = 0;
+  let saved = 0;
   const byCat = {};
   for (const t of data || []) {
-    if (t.type === 'income') continue;
     const a = Number(t.amount);
+    if (t.type === 'income') continue;
+    if (t.type === 'savings') {
+      saved += a;
+      continue;
+    }
     spent += a;
     byCat[t.category] = (byCat[t.category] || 0) + a;
   }
-  if (!spent) return '📊 This week: no expenses logged yet.';
+  if (!spent && !saved) return '📊 This week: nothing logged yet.';
   const top = Object.entries(byCat).sort((a, b) => b[1] - a[1])[0];
   const topPart = top ? `, top: ${top[0]} (${DEFAULT_CURRENCY} ${top[1].toFixed(2)})` : '';
-  return `📊 This week you've spent ${DEFAULT_CURRENCY} ${spent.toFixed(2)}${topPart}.`;
+  const savedPart = saved ? ` Saved ${DEFAULT_CURRENCY} ${saved.toFixed(2)}.` : '';
+  return `📊 This week you've spent ${DEFAULT_CURRENCY} ${spent.toFixed(2)}${topPart}.${savedPart}`;
 }
 
 // POST /webhook/whatsapp — Twilio posts inbound WhatsApp messages here

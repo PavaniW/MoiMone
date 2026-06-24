@@ -126,8 +126,14 @@ export default function Transactions() {
 
   const reviewCount = useMemo(() => rows.filter(isReview).length, [rows]);
 
+  // Net = income − expense; savings is set-aside money, not part of the net.
   const total = useMemo(
-    () => filtered.reduce((sum, t) => sum + (t.type === 'income' ? 1 : -1) * Number(t.amount), 0),
+    () =>
+      filtered.reduce((sum, t) => {
+        if (t.type === 'income') return sum + Number(t.amount);
+        if (t.type === 'expense') return sum - Number(t.amount);
+        return sum;
+      }, 0),
     [filtered]
   );
 
@@ -234,6 +240,7 @@ export default function Transactions() {
           <option value="">All types</option>
           <option value="expense">Expense</option>
           <option value="income">Income</option>
+          <option value="savings">Savings</option>
         </select>
         <select className="field-input" value={source} onChange={(e) => setSource(e.target.value)}>
           <option value="">All sources</option>
@@ -293,6 +300,7 @@ export default function Transactions() {
             </div>
             {filtered.map((t) => {
               const isIncome = t.type === 'income';
+              const isSaving = t.type === 'savings';
               const label = cardLabel(t, cardsById);
               return (
                 <div className="ledger-row edit body" key={t.id}>
@@ -325,8 +333,8 @@ export default function Transactions() {
                     </select>
                   </span>
                   <span className="src-tag hide-sm">{t.source}</span>
-                  <span className={`ledger-amount ${isIncome ? 'income' : 'expense'}`}>
-                    {isIncome ? '+' : '−'}
+                  <span className={`ledger-amount ${isIncome ? 'income' : isSaving ? 'saved' : 'expense'}`}>
+                    {isIncome ? '+' : isSaving ? '⇢' : '−'}
                     <span className="sym">{CURRENCY}</span>
                     {formatAmount(Number(t.amount))}
                   </span>

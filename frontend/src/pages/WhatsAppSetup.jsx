@@ -111,6 +111,30 @@ export default function WhatsAppSetup() {
           <li>It logs to your private account and replies with a confirmation + your remaining budget.</li>
         </ol>
       </div>
+
+      <div className="panel" style={{ marginTop: '1.25rem' }}>
+        <div className="panel-head">
+          <h3 className="panel-title">What you can send</h3>
+        </div>
+        <ul className="wa-cmds">
+          <li>
+            <span className="wa-cmd-eg">“spent 200 on lunch at KFC”</span>
+            <span className="wa-cmd-desc">Log an expense — it parses the amount, merchant &amp; category.</span>
+          </li>
+          <li>
+            <span className="wa-cmd-eg">“got salary 150000”</span>
+            <span className="wa-cmd-desc">Log income.</span>
+          </li>
+          <li>
+            <span className="wa-cmd-eg">“paid USD 50 for hosting”</span>
+            <span className="wa-cmd-desc">Foreign currency is auto-converted to LKR.</span>
+          </li>
+          <li>
+            <span className="wa-cmd-eg"><code>summary</code></span>
+            <span className="wa-cmd-desc">Get this week’s total spend + top category. (Also <code>week</code> / <code>report</code>.)</span>
+          </li>
+        </ul>
+      </div>
     </section>
   );
 }

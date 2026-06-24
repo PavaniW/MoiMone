@@ -416,6 +416,9 @@ body {
   border-top: none;
   background: var(--panel);
 }
+.stmt-summary.four {
+  grid-template-columns: repeat(4, 1fr);
+}
 
 .summary-cell {
   padding: 1.1rem 1.3rem;
@@ -1171,6 +1174,9 @@ body {
   .stmt-summary {
     grid-template-columns: 1fr;
   }
+  .stmt-summary.four {
+    grid-template-columns: 1fr 1fr; /* 2×2 on mobile */
+  }
   .summary-cell {
     border-right: none;
     border-bottom: 1px solid var(--line);
@@ -1846,4 +1852,38 @@ body {
   font-weight: 400;
   opacity: 0.8;
   font-size: 0.78rem;
+}
+
+/* Savings amount in the ledger (set-aside money, neither + nor −) */
+.ledger-amount.saved {
+  color: #2a9d8f;
+}
+
+/* ---------- WhatsApp command list ---------- */
+.wa-cmds {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+.wa-cmds li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.wa-cmd-eg {
+  font-family: var(--mono);
+  font-size: 0.88rem;
+  color: var(--ink);
+}
+.wa-cmd-eg code {
+  background: var(--bar);
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+}
+.wa-cmd-desc {
+  font-size: 0.82rem;
+  color: var(--muted);
 }

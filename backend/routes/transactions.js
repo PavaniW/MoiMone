@@ -38,6 +38,36 @@ function badRequest(message) {
   return err;
 }
 
+const TYPES = ['expense', 'income', 'savings'];
+
+// Validate a goal_id belongs to one of the user's spaces; returns its id or null.
+async function resolveGoalId(req, goalId) {
+  if (!goalId) return null;
+  const { data, error } = await supabase
+    .from('goals')
+    .select('id')
+    .eq('id', goalId)
+    .in('space_id', req.spaceIds)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw badRequest('goal not found');
+  return data.id;
+}
+
+// Adjust a goal's saved amount by delta (savings transactions feed goal progress).
+async function bumpGoal(goalId, delta, spaceIds) {
+  if (!goalId || !delta) return;
+  const { data: g } = await supabase
+    .from('goals')
+    .select('current_amount')
+    .eq('id', goalId)
+    .in('space_id', spaceIds)
+    .maybeSingle();
+  if (!g) return;
+  const next = Math.max(0, Number(g.current_amount) + delta);
+  await supabase.from('goals').update({ current_amount: next }).eq('id', goalId).in('space_id', spaceIds);
+}
+
 // GET /api/transactions — list transactions in the user's spaces, newest first.
 // Optional query: ?month=&year=, ?limit=, ?category=, ?source=, ?type=, ?space=.
 router.get('/', async (req, res, next) => {
@@ -86,26 +116,30 @@ router.post('/', async (req, res, next) => {
 
     const value = Math.abs(Number(amount));
     if (!value) throw badRequest('amount must be a non-zero number');
-    if (type !== 'expense' && type !== 'income') {
-      throw badRequest("type must be 'expense' or 'income'");
-    }
-    if (!category || !String(category).trim()) throw badRequest('category is required');
+    if (!TYPES.includes(type)) throw badRequest("type must be 'expense', 'income' or 'savings'");
     if (payment_method != null && payment_method !== '' && !PAYMENT_METHODS.includes(payment_method)) {
       throw badRequest(`payment_method must be one of: ${PAYMENT_METHODS.join(', ')}`);
     }
 
+    const isSavings = type === 'savings';
+    // Savings are money set aside (no card), optionally feeding a goal.
+    const goalId = isSavings ? await resolveGoalId(req, req.body?.goal_id) : null;
+    const cat = isSavings ? String(category || '').trim() || 'Savings' : String(category || '').trim();
+    if (!cat) throw badRequest('category is required');
+
     // A chosen card sets the method + last4; otherwise use the raw fields (cash/other).
-    const card = await resolveCard(req, card_id);
+    const card = isSavings ? null : await resolveCard(req, card_id);
 
     const row = {
       amount: value,
       type,
-      category: String(category).trim(),
+      category: cat,
       merchant: merchant ? String(merchant).trim() : null,
       description: description ? String(description).trim() : null,
-      payment_method: card ? card.type : payment_method || null,
-      card_last4: card ? card.last4 : cleanLast4(card_last4),
-      card_id: card ? card.id : null,
+      payment_method: isSavings ? null : card ? card.type : payment_method || null,
+      card_last4: isSavings ? null : card ? card.last4 : cleanLast4(card_last4),
+      card_id: isSavings ? null : card ? card.id : null,
+      goal_id: goalId,
       source: 'manual',
       space_id: targetSpace(req, req.body?.space_id),
       created_by: req.user.id,
@@ -114,6 +148,9 @@ router.post('/', async (req, res, next) => {
 
     const { data, error } = await supabase.from('transactions').insert(row).select().single();
     if (error) throw new Error(error.message);
+
+    // Linked savings contribute to the goal's progress.
+    if (isSavings && goalId) await bumpGoal(goalId, value, req.spaceIds);
 
     res.status(201).json(data);
   } catch (err) {
@@ -127,6 +164,17 @@ router.put('/:id', async (req, res, next) => {
   try {
     const { amount, type, category, merchant, description, transaction_date, payment_method, card_last4, card_id } =
       req.body || {};
+
+    // Load the existing row first (need its old type/amount/goal for goal sync).
+    const { data: old, error: oldErr } = await supabase
+      .from('transactions')
+      .select('*')
+      .eq('id', req.params.id)
+      .in('space_id', req.spaceIds)
+      .maybeSingle();
+    if (oldErr) throw new Error(oldErr.message);
+    if (!old) return res.status(404).json({ error: 'Transaction not found' });
+
     const updates = {};
 
     if (amount !== undefined) {
@@ -135,9 +183,7 @@ router.put('/:id', async (req, res, next) => {
       updates.amount = value;
     }
     if (type !== undefined) {
-      if (type !== 'expense' && type !== 'income') {
-        throw badRequest("type must be 'expense' or 'income'");
-      }
+      if (!TYPES.includes(type)) throw badRequest("type must be 'expense', 'income' or 'savings'");
       updates.type = type;
     }
     if (category !== undefined) {
@@ -158,7 +204,6 @@ router.put('/:id', async (req, res, next) => {
       updates.payment_method = payment_method || null;
     }
     if (card_last4 !== undefined) updates.card_last4 = cleanLast4(card_last4);
-    // A chosen card overrides method/last4; an empty card_id clears the link.
     if (card_id !== undefined) {
       if (card_id) {
         const card = await resolveCard(req, card_id);
@@ -169,8 +214,20 @@ router.put('/:id', async (req, res, next) => {
         updates.card_id = null;
       }
     }
-    // Moving an entry between spaces (e.g. Personal -> Shared).
+    if (req.body?.goal_id !== undefined) {
+      updates.goal_id = req.body.goal_id ? await resolveGoalId(req, req.body.goal_id) : null;
+    }
     if (req.body?.space_id !== undefined) updates.space_id = targetSpace(req, req.body.space_id);
+
+    // Resolve the post-update type; a non-savings entry can't hold a goal/card link.
+    const finalType = updates.type ?? old.type;
+    if (finalType === 'savings') {
+      updates.card_id = null;
+      updates.payment_method = null;
+      updates.card_last4 = null;
+    } else {
+      updates.goal_id = null;
+    }
 
     if (!Object.keys(updates).length) throw badRequest('no fields to update');
 
@@ -183,6 +240,10 @@ router.put('/:id', async (req, res, next) => {
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!data) return res.status(404).json({ error: 'Transaction not found' });
+
+    // Re-sync goal progress: remove the old savings contribution, add the new one.
+    if (old.type === 'savings' && old.goal_id) await bumpGoal(old.goal_id, -Number(old.amount), req.spaceIds);
+    if (data.type === 'savings' && data.goal_id) await bumpGoal(data.goal_id, Number(data.amount), req.spaceIds);
 
     res.json(data);
   } catch (err) {
@@ -202,6 +263,9 @@ router.delete('/:id', async (req, res, next) => {
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!data) return res.status(404).json({ error: 'Transaction not found' });
+
+    // Deleting a linked savings entry removes its contribution from the goal.
+    if (data.type === 'savings' && data.goal_id) await bumpGoal(data.goal_id, -Number(data.amount), req.spaceIds);
 
     res.json({ deleted: data.id });
   } catch (err) {

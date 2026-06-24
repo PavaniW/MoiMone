@@ -13,10 +13,13 @@ function summarize(rows) {
   const byCategory = {};
   let totalIncome = 0;
   let totalExpense = 0;
+  let totalSaved = 0;
   for (const t of rows) {
     const amt = Number(t.amount) || 0;
     if (t.type === 'income') {
       totalIncome += amt;
+    } else if (t.type === 'savings') {
+      totalSaved += amt;
     } else {
       totalExpense += amt;
       byCategory[t.category] = (byCategory[t.category] || 0) + amt;
@@ -24,7 +27,13 @@ function summarize(rows) {
   }
   const rounded = {};
   for (const [k, v] of Object.entries(byCategory)) rounded[k] = round(v);
-  return { totalIncome: round(totalIncome), totalExpense: round(totalExpense), byCategory: rounded };
+  return {
+    totalIncome: round(totalIncome),
+    totalExpense: round(totalExpense),
+    totalSaved: round(totalSaved),
+    available: round(totalIncome - totalExpense - totalSaved),
+    byCategory: rounded,
+  };
 }
 
 // Assemble a compact summary of the user's finances for the LLM. Covers this

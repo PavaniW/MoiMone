@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
 import { Spinner } from './Loading.jsx';
 import { useSpace } from '../space.jsx';
@@ -21,6 +21,7 @@ function toForm(categories, t, defaultSpace) {
       description: '',
       paidWith: '',
       space: defaultSpace || '',
+      goal: '',
     };
   }
   return {
@@ -37,6 +38,7 @@ function toForm(categories, t, defaultSpace) {
         ? t.payment_method
         : '',
     space: t.space_id || defaultSpace || '',
+    goal: t.goal_id || '',
   };
 }
 
@@ -53,8 +55,20 @@ export default function AddTransaction({ categories = [], cards = [], spaceId = 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [remember, setRemember] = useState(false); // teach merchant → category
+  const [goals, setGoals] = useState([]);
 
   const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
+  const isSavings = form.type === 'savings';
+
+  // Goals (for linking a savings entry) in the chosen space.
+  useEffect(() => {
+    if (!form.space) return;
+    let active = true;
+    api.getGoals(`?space=${form.space}`).then((g) => active && setGoals(g)).catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [form.space]);
 
   async function submit(e) {
     e.preventDefault();
@@ -68,22 +82,29 @@ export default function AddTransaction({ categories = [], cards = [], spaceId = 
     const payload = {
       type: form.type,
       amount: Number(form.amount),
-      merchant: form.merchant.trim() || null,
-      category: form.category,
       transaction_date: form.transaction_date,
       description: form.description.trim() || null,
     };
-    // Resolve "Paid with": a registered card, or cash/other, or nothing.
-    if (form.paidWith.startsWith('card:')) {
-      payload.card_id = form.paidWith.slice(5);
-    } else if (form.paidWith === 'cash' || form.paidWith === 'other') {
-      payload.payment_method = form.paidWith;
-      payload.card_id = null;
-      payload.card_last4 = null;
+
+    if (isSavings) {
+      // Savings: set aside money, optionally linked to a goal. No card/category.
+      payload.goal_id = form.goal || null;
     } else {
-      payload.payment_method = null;
-      payload.card_id = null;
-      payload.card_last4 = null;
+      payload.merchant = form.merchant.trim() || null;
+      payload.category = form.category;
+      payload.goal_id = null;
+      // Resolve "Paid with": a registered card, or cash/other, or nothing.
+      if (form.paidWith.startsWith('card:')) {
+        payload.card_id = form.paidWith.slice(5);
+      } else if (form.paidWith === 'cash' || form.paidWith === 'other') {
+        payload.payment_method = form.paidWith;
+        payload.card_id = null;
+        payload.card_last4 = null;
+      } else {
+        payload.payment_method = null;
+        payload.card_id = null;
+        payload.card_last4 = null;
+      }
     }
 
     setSaving(true);
@@ -124,6 +145,13 @@ export default function AddTransaction({ categories = [], cards = [], spaceId = 
         >
           Income
         </button>
+        <button
+          type="button"
+          className={form.type === 'savings' ? 'seg-btn active' : 'seg-btn'}
+          onClick={() => setForm((f) => ({ ...f, type: 'savings' }))}
+        >
+          Savings
+        </button>
       </div>
 
       <div className="field-grid">
@@ -141,28 +169,46 @@ export default function AddTransaction({ categories = [], cards = [], spaceId = 
           />
         </label>
 
-        <label className="field">
-          <span className="field-label">Merchant</span>
-          <input
-            className="field-input"
-            type="text"
-            value={form.merchant}
-            onChange={set('merchant')}
-            placeholder="e.g. Keells"
-          />
-        </label>
+        {!isSavings && (
+          <label className="field">
+            <span className="field-label">Merchant</span>
+            <input
+              className="field-input"
+              type="text"
+              value={form.merchant}
+              onChange={set('merchant')}
+              placeholder="e.g. Keells"
+            />
+          </label>
+        )}
 
-        <label className="field">
-          <span className="field-label">Category</span>
-          <select className="field-input" value={form.category} onChange={set('category')}>
-            {categories.map((c) => (
-              <option key={c.name} value={c.name}>
-                {c.icon ? `${c.icon}  ` : ''}
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        {!isSavings && (
+          <label className="field">
+            <span className="field-label">Category</span>
+            <select className="field-input" value={form.category} onChange={set('category')}>
+              {categories.map((c) => (
+                <option key={c.name} value={c.name}>
+                  {c.icon ? `${c.icon}  ` : ''}
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+
+        {isSavings && (
+          <label className="field">
+            <span className="field-label">Goal (optional)</span>
+            <select className="field-input" value={form.goal} onChange={set('goal')}>
+              <option value="">— no goal —</option>
+              {goals.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
 
         <label className="field">
           <span className="field-label">Date</span>
@@ -174,20 +220,22 @@ export default function AddTransaction({ categories = [], cards = [], spaceId = 
           />
         </label>
 
-        <label className="field">
-          <span className="field-label">Paid with</span>
-          <select className="field-input" value={form.paidWith} onChange={set('paidWith')}>
-            <option value="">—</option>
-            {cards.map((c) => (
-              <option key={c.id} value={`card:${c.id}`}>
-                {c.nickname}
-                {c.last4 ? ` ••${c.last4}` : ''}
-              </option>
-            ))}
-            <option value="cash">Cash</option>
-            <option value="other">Other</option>
-          </select>
-        </label>
+        {!isSavings && (
+          <label className="field">
+            <span className="field-label">Paid with</span>
+            <select className="field-input" value={form.paidWith} onChange={set('paidWith')}>
+              <option value="">—</option>
+              {cards.map((c) => (
+                <option key={c.id} value={`card:${c.id}`}>
+                  {c.nickname}
+                  {c.last4 ? ` ••${c.last4}` : ''}
+                </option>
+              ))}
+              <option value="cash">Cash</option>
+              <option value="other">Other</option>
+            </select>
+          </label>
+        )}
 
         {spaces.length > 1 && (
           <label className="field">

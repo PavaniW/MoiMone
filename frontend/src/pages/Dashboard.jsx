@@ -33,12 +33,15 @@ function build(categories, cards, windowTxns, recentTxns, budgetRows, period) {
 
   let spent = 0;
   let income = 0;
+  let saved = 0;
   const byCategory = {};
   const byCardMap = {};
   for (const t of monthTxns) {
     const amount = Number(t.amount);
     if (t.type === 'income') {
       income += amount;
+    } else if (t.type === 'savings') {
+      saved += amount;
     } else {
       spent += amount;
       byCategory[t.category] = (byCategory[t.category] || 0) + amount;
@@ -80,7 +83,7 @@ function build(categories, cards, windowTxns, recentTxns, budgetRows, period) {
   for (let i = 5; i >= 0; i--) {
     const p = addMonths(period.month, period.year, -i);
     const amount = windowTxns
-      .filter((t) => t.type !== 'income' && inMonth(t, p.month, p.year))
+      .filter((t) => t.type === 'expense' && inMonth(t, p.month, p.year))
       .reduce((s, t) => s + Number(t.amount), 0);
     trend.push({ key: monthKey(p.month, p.year), label: monthShort(p.month, p.year), amount, current: i === 0 });
   }
@@ -92,7 +95,7 @@ function build(categories, cards, windowTxns, recentTxns, budgetRows, period) {
   }));
 
   return {
-    summary: { spent, income, net: income - spent },
+    summary: { spent, income, saved, available: income - spent - saved },
     spendByCategory,
     budgets,
     totalBudget,
@@ -182,19 +185,23 @@ export default function Dashboard() {
       </header>
 
       {/* Summary band — the hero */}
-      <div className="stmt-summary">
-        <div className="summary-cell">
-          <div className="summary-label">Spent</div>
-          <div className="summary-value num"><span className="sym">{CURRENCY}</span>{formatAmount(summary.spent)}</div>
-        </div>
+      <div className="stmt-summary four">
         <div className="summary-cell">
           <div className="summary-label">Income</div>
           <div className="summary-value num"><span className="sym">{CURRENCY}</span>{formatAmount(summary.income)}</div>
         </div>
         <div className="summary-cell">
-          <div className="summary-label">Net</div>
-          <div className={`summary-value num ${summary.net >= 0 ? 'pos' : 'neg'}`}>
-            <span className="sym">{summary.net >= 0 ? `+ ${CURRENCY}` : `− ${CURRENCY}`}</span>{formatAmount(Math.abs(summary.net))}
+          <div className="summary-label">Spent</div>
+          <div className="summary-value num"><span className="sym">{CURRENCY}</span>{formatAmount(summary.spent)}</div>
+        </div>
+        <div className="summary-cell">
+          <div className="summary-label">Saved</div>
+          <div className="summary-value num"><span className="sym">{CURRENCY}</span>{formatAmount(summary.saved)}</div>
+        </div>
+        <div className="summary-cell">
+          <div className="summary-label">Available</div>
+          <div className={`summary-value num ${summary.available >= 0 ? 'pos' : 'neg'}`}>
+            <span className="sym">{summary.available >= 0 ? CURRENCY : `− ${CURRENCY}`}</span>{formatAmount(Math.abs(summary.available))}
           </div>
         </div>
       </div>

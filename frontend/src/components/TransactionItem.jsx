@@ -4,6 +4,7 @@ import { formatAmount, formatDay, CURRENCY } from '../lib/format.js';
 export default function TransactionItem({ transaction }) {
   const { transaction_date, merchant, category, source, type, amount, color } = transaction;
   const isIncome = type === 'income';
+  const isSaving = type === 'savings';
 
   return (
     <div className="ledger-row body">
@@ -14,8 +15,8 @@ export default function TransactionItem({ transaction }) {
       </span>
       <span className="ledger-cat">{category}</span>
       <span className="src-tag">{source}</span>
-      <span className={`ledger-amount ${isIncome ? 'income' : 'expense'}`}>
-        {isIncome ? '+' : '−'}
+      <span className={`ledger-amount ${isIncome ? 'income' : isSaving ? 'saved' : 'expense'}`}>
+        {isIncome ? '+' : isSaving ? '⇢' : '−'}
         <span className="sym">{CURRENCY}</span>
         {formatAmount(amount)}
       </span>
