@@ -197,7 +197,7 @@ export default function Transactions() {
       {/* Filters */}
       <div className="filters">
         <input
-          className="field-input"
+          className="field-input filter-search"
           type="search"
           placeholder="Search merchant or note…"
           value={q}

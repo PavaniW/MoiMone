@@ -1192,6 +1192,9 @@ body {
   .filters {
     grid-template-columns: 1fr 1fr;
   }
+  .filter-search {
+    grid-column: 1 / -1; /* search on its own full-width row */
+  }
   .filter-dates {
     grid-column: 1 / -1; /* From + To share one full-width row on mobile */
   }
