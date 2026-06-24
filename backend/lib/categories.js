@@ -1,15 +1,24 @@
 import { supabase } from './supabase.js';
 
 // The starter set every new account is seeded with (name, icon, color).
-// Mirrors the original global seed in supabase/schema.sql.
+// Keep in sync with supabase/recategorize.sql (the migration for existing users).
 export const DEFAULT_CATEGORIES = [
-  { name: 'Food & Dining', icon: '🍽️', color: '#FF6B6B' },
+  { name: 'Groceries', icon: '🛒', color: '#FF6B6B' },
+  { name: 'Eating Out', icon: '🍽️', color: '#F4845F' },
+  { name: 'Coffee & Snacks', icon: '☕', color: '#C08552' },
   { name: 'Transport', icon: '🚗', color: '#4ECDC4' },
-  { name: 'Shopping', icon: '🛍️', color: '#45B7D1' },
+  { name: 'Clothing', icon: '👗', color: '#45B7D1' },
+  { name: 'Beauty & Grooming', icon: '💄', color: '#E27396' },
+  { name: 'Gifts & Celebrations', icon: '🎁', color: '#B5179E' },
+  { name: 'Travel', icon: '✈️', color: '#2A9D8F' },
+  { name: 'Entertainment', icon: '🎬', color: '#FFB703' },
+  { name: 'Subscriptions', icon: '📱', color: '#6A4C93' },
+  { name: 'Phone & Internet', icon: '📶', color: '#577590' },
   { name: 'Utilities', icon: '💡', color: '#96CEB4' },
-  { name: 'Entertainment', icon: '🎬', color: '#FFEAA7' },
   { name: 'Health', icon: '💊', color: '#DDA0DD' },
+  { name: 'Household', icon: '🏠', color: '#8D6E63' },
   { name: 'Salary', icon: '💰', color: '#90EE90' },
+  { name: 'Other Income', icon: '💵', color: '#57CC99' },
   { name: 'Other', icon: '📦', color: '#D3D3D3' },
 ];
 
