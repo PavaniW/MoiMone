@@ -264,7 +264,7 @@ export default function AddTransaction({ categories = [], cards = [], goals = []
 
         {!isTransfer && (
           <label className="field">
-            <span className="field-label">Paid with</span>
+            <span className="field-label">Account</span>
             <select className="field-input" value={form.paidWith} onChange={set('paidWith')}>
               <option value="">—</option>
               {cards.map((c) => (
@@ -273,7 +273,8 @@ export default function AddTransaction({ categories = [], cards = [], goals = []
                   {c.last4 ? ` ••${c.last4}` : ''}
                 </option>
               ))}
-              <option value="cash">Cash</option>
+              {/* Cash is a real (seeded) account in the list above; this is for
+                  spending not tied to any of your tracked accounts. */}
               <option value="other">Other</option>
             </select>
           </label>
