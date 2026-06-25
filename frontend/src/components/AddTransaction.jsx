@@ -87,6 +87,7 @@ export default function AddTransaction({ categories = [], cards = [], goals = []
     if (isTransfer) {
       payload.card_id = form.from;
       payload.to_card_id = form.to;
+      payload.goal_id = form.goal || null; // tagging a goal makes it a "saving"
     } else if (isSavings) {
       // Savings: set aside money, optionally linked to a goal. No card/category.
       payload.goal_id = form.goal || null;
@@ -146,13 +147,12 @@ export default function AddTransaction({ categories = [], cards = [], goals = []
         >
           Income
         </button>
-        <button
-          type="button"
-          className={form.type === 'savings' ? 'seg-btn active' : 'seg-btn'}
-          onClick={() => setForm((f) => ({ ...f, type: 'savings' }))}
-        >
-          Savings
-        </button>
+        {form.type === 'savings' && (
+          // Legacy savings entries stay editable; new ones use Transfer + Goal.
+          <button type="button" className="seg-btn active">
+            Savings
+          </button>
+        )}
         <button
           type="button"
           className={form.type === 'transfer' ? 'seg-btn active' : 'seg-btn'}
@@ -234,9 +234,9 @@ export default function AddTransaction({ categories = [], cards = [], goals = []
           </label>
         )}
 
-        {isSavings && (
+        {(isSavings || isTransfer) && (
           <label className="field">
-            <span className="field-label">Goal (optional)</span>
+            <span className="field-label">{isTransfer ? 'Goal (optional — makes it a saving)' : 'Goal (optional)'}</span>
             <select className="field-input" value={form.goal} onChange={set('goal')}>
               <option value="">— no goal —</option>
               {goals.map((g) => (

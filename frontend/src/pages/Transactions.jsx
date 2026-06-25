@@ -135,7 +135,9 @@ export default function Transactions() {
     () =>
       filtered.reduce((sum, t) => {
         if (t.type === 'income') return sum + Number(t.amount);
-        if (t.type === 'transfer') return sum; // moves between your own accounts
+        // A plain transfer just moves between your own accounts (net 0); but a
+        // goal-tagged transfer is a saving, so it leaves spendable cash.
+        if (t.type === 'transfer') return t.goal_id ? sum - Number(t.amount) : sum;
         return sum - Number(t.amount); // expense + savings reduce money in hand
       }, 0),
     [filtered]
@@ -306,16 +308,20 @@ export default function Transactions() {
             </div>
             {filtered.map((t) => {
               const isIncome = t.type === 'income';
-              const isSaving = t.type === 'savings';
-              const isTransfer = t.type === 'transfer';
-              const label = isTransfer ? '' : cardLabel(t, cardsById);
-              const name = isSaving
-                ? t.goal?.name
-                  ? `Savings → ${t.goal.name}`
-                  : 'Savings'
-                : isTransfer
-                  ? `Transfer: ${t.card?.nickname || '—'} → ${t.to_account?.nickname || '—'}`
-                  : t.merchant || '—';
+              // A goal-tagged transfer is a saving; treat it like one for display.
+              const isGoalTransfer = t.type === 'transfer' && t.goal_id;
+              const isSaving = t.type === 'savings' || isGoalTransfer;
+              const isTransfer = t.type === 'transfer' && !isGoalTransfer;
+              const label = isTransfer || isGoalTransfer ? '' : cardLabel(t, cardsById);
+              const name = isGoalTransfer
+                ? `Savings → ${t.goal?.name || 'Goal'}`
+                : t.type === 'savings'
+                  ? t.goal?.name
+                    ? `Savings → ${t.goal.name}`
+                    : 'Savings'
+                  : isTransfer
+                    ? `Transfer: ${t.card?.nickname || '—'} → ${t.to_account?.nickname || '—'}`
+                    : t.merchant || '—';
               return (
                 <div className="ledger-row edit body" key={t.id}>
                   <span className="ledger-date num">{formatDay(t.transaction_date)}</span>

@@ -18,7 +18,7 @@ function summarize(rows) {
     const amt = Number(t.amount) || 0;
     if (t.type === 'income') {
       totalIncome += amt;
-    } else if (t.type === 'savings') {
+    } else if (t.type === 'savings' || (t.type === 'transfer' && t.goal_id)) {
       totalSaved += amt;
     } else if (t.type === 'expense') {
       totalExpense += amt;
@@ -50,7 +50,7 @@ async function buildContext(req, spaceIds) {
   // One query for everything from the start of last month onward.
   const { data: txns, error: txErr } = await supabase
     .from('transactions')
-    .select('amount, type, category, merchant, payment_method, transaction_date')
+    .select('amount, type, category, merchant, payment_method, transaction_date, goal_id')
     .in('space_id', spaceIds)
     .gte('transaction_date', prevRange.start)
     .order('transaction_date', { ascending: false });

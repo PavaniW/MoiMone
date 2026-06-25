@@ -41,6 +41,9 @@ function badRequest(message) {
 
 const TYPES = ['expense', 'income', 'savings', 'transfer'];
 
+// A transaction "feeds a goal" when it's a saving OR a goal-tagged transfer.
+const feedsGoal = (t) => (t.type === 'savings' || t.type === 'transfer') && t.goal_id;
+
 // Apply (sign +1) or reverse (sign -1) a transaction's effect on account balances.
 // expense lowers its account, income raises it, transfer moves between accounts.
 async function applyBalanceEffect(t, sign, userId) {
@@ -138,6 +141,8 @@ router.post('/', async (req, res, next) => {
       if (card_id === toId) throw badRequest('the from and to accounts must be different');
       await resolveCard(req, card_id); // validate ownership of both
       await resolveCard(req, toId);
+      // A transfer can be tagged with a goal — that's how "saving" is recorded.
+      const goalId = await resolveGoalId(req, req.body?.goal_id);
       const trow = {
         amount: value,
         type: 'transfer',
@@ -147,6 +152,7 @@ router.post('/', async (req, res, next) => {
         payment_method: null,
         card_id, // from
         to_card_id: toId, // to
+        goal_id: goalId,
         source: 'manual',
         space_id: targetSpace(req, req.body?.space_id),
         created_by: req.user.id,
@@ -155,6 +161,7 @@ router.post('/', async (req, res, next) => {
       const { data, error } = await supabase.from('transactions').insert(trow).select().single();
       if (error) throw new Error(error.message);
       await applyBalanceEffect(data, +1, req.user.id);
+      if (goalId) await bumpGoal(goalId, value, req.spaceIds);
       return res.status(201).json(data);
     }
 
@@ -265,14 +272,15 @@ router.put('/:id', async (req, res, next) => {
     }
     if (req.body?.space_id !== undefined) updates.space_id = targetSpace(req, req.body.space_id);
 
-    // Resolve the post-update type; a non-savings entry can't hold a goal/card link.
+    // Resolve the post-update type. Savings/transfer may hold a goal; income/
+    // expense may not. Savings has no card; transfer keeps its from/to cards.
     const finalType = updates.type ?? old.type;
     if (finalType === 'savings') {
       updates.card_id = null;
       updates.payment_method = null;
       updates.card_last4 = null;
-    } else {
-      updates.goal_id = null;
+    } else if (finalType !== 'transfer') {
+      updates.goal_id = null; // income/expense don't link goals
     }
 
     if (!Object.keys(updates).length) throw badRequest('no fields to update');
@@ -287,9 +295,10 @@ router.put('/:id', async (req, res, next) => {
     if (error) throw new Error(error.message);
     if (!data) return res.status(404).json({ error: 'Transaction not found' });
 
-    // Re-sync goal progress: remove the old savings contribution, add the new one.
-    if (old.type === 'savings' && old.goal_id) await bumpGoal(old.goal_id, -Number(old.amount), req.spaceIds);
-    if (data.type === 'savings' && data.goal_id) await bumpGoal(data.goal_id, Number(data.amount), req.spaceIds);
+    // Re-sync goal progress: remove the old contribution, add the new one
+    // (savings or goal-tagged transfers feed a goal).
+    if (feedsGoal(old)) await bumpGoal(old.goal_id, -Number(old.amount), req.spaceIds);
+    if (feedsGoal(data)) await bumpGoal(data.goal_id, Number(data.amount), req.spaceIds);
 
     // Re-sync account balances: reverse the old effect, apply the new one.
     await applyBalanceEffect(old, -1, req.user.id);
@@ -314,8 +323,8 @@ router.delete('/:id', async (req, res, next) => {
     if (error) throw new Error(error.message);
     if (!data) return res.status(404).json({ error: 'Transaction not found' });
 
-    // Deleting a linked savings entry removes its contribution from the goal.
-    if (data.type === 'savings' && data.goal_id) await bumpGoal(data.goal_id, -Number(data.amount), req.spaceIds);
+    // Deleting a goal-feeding entry removes its contribution from the goal.
+    if (feedsGoal(data)) await bumpGoal(data.goal_id, -Number(data.amount), req.spaceIds);
     // Reverse its effect on account balances.
     await applyBalanceEffect(data, -1, req.user.id);
 
