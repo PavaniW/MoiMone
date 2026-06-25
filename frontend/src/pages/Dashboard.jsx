@@ -94,9 +94,17 @@ function build(categories, cards, windowTxns, recentTxns, budgetRows, period) {
     color: colorOf[t.category] || FALLBACK_COLOR,
   }));
 
+  // "Available" = what you can actually spend right now: the balance of your
+  // everyday spending accounts (debit + cash). Bank/savings and credit are
+  // excluded. This is a live balance, not a monthly flow, so it doesn't change
+  // as you browse past months.
+  const available = cards
+    .filter((c) => c.type === 'debit' || c.type === 'cash')
+    .reduce((s, c) => s + Number(c.balance || 0), 0);
+
   return {
     accounts: cards,
-    summary: { spent, income, saved, available: income - spent - saved },
+    summary: { spent, income, saved, available },
     spendByCategory,
     budgets,
     totalBudget,
@@ -204,6 +212,7 @@ export default function Dashboard() {
           <div className={`summary-value num ${summary.available >= 0 ? 'pos' : 'neg'}`}>
             <span className="sym">{summary.available >= 0 ? CURRENCY : `− ${CURRENCY}`}</span>{formatAmount(Math.abs(summary.available))}
           </div>
+          <div className="summary-sub">Debit + Cash balance</div>
         </div>
       </div>
 

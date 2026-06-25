@@ -168,7 +168,7 @@ export default function AddTransaction({ categories = [], cards = [], goals = []
 
       <div className="field-grid">
         <label className="field">
-          <span className="field-label">Amount</span>
+          <span className="field-label">Amount *</span>
           <input
             className="field-input num"
             type="number"
@@ -183,7 +183,7 @@ export default function AddTransaction({ categories = [], cards = [], goals = []
 
         {isTransfer && (
           <label className="field">
-            <span className="field-label">From account</span>
+            <span className="field-label">From account *</span>
             <select className="field-input" value={form.from} onChange={set('from')}>
               <option value="">—</option>
               {cards.map((c) => (
@@ -198,7 +198,7 @@ export default function AddTransaction({ categories = [], cards = [], goals = []
 
         {isTransfer && (
           <label className="field">
-            <span className="field-label">To account</span>
+            <span className="field-label">To account *</span>
             <select className="field-input" value={form.to} onChange={set('to')}>
               <option value="">—</option>
               {cards.map((c) => (
@@ -213,7 +213,7 @@ export default function AddTransaction({ categories = [], cards = [], goals = []
 
         {!isTransfer && (
           <label className="field">
-            <span className="field-label">Merchant</span>
+            <span className="field-label">Merchant *</span>
             <input
               className="field-input"
               type="text"
@@ -226,7 +226,7 @@ export default function AddTransaction({ categories = [], cards = [], goals = []
 
         {!isTransfer && (
           <label className="field">
-            <span className="field-label">Category</span>
+            <span className="field-label">Category *</span>
             <select className="field-input" value={form.category} onChange={set('category')}>
               {categories.map((c) => (
                 <option key={c.name} value={c.name}>
@@ -240,7 +240,7 @@ export default function AddTransaction({ categories = [], cards = [], goals = []
 
         {isTransfer && (
           <label className="field">
-            <span className="field-label">Goal (optional — makes it a saving)</span>
+            <span className="field-label">Goal (makes it a saving)</span>
             <select className="field-input" value={form.goal} onChange={set('goal')}>
               <option value="">— no goal —</option>
               {goals.map((g) => (
@@ -253,7 +253,7 @@ export default function AddTransaction({ categories = [], cards = [], goals = []
         )}
 
         <label className="field">
-          <span className="field-label">Date</span>
+          <span className="field-label">Date *</span>
           <input
             className="field-input num"
             type="date"
@@ -264,7 +264,7 @@ export default function AddTransaction({ categories = [], cards = [], goals = []
 
         {!isTransfer && (
           <label className="field">
-            <span className="field-label">Account</span>
+            <span className="field-label">Account *</span>
             <select className="field-input" value={form.paidWith} onChange={set('paidWith')}>
               <option value="">—</option>
               {cards.map((c) => (
@@ -282,7 +282,7 @@ export default function AddTransaction({ categories = [], cards = [], goals = []
 
         {spaces.length > 1 && (
           <label className="field">
-            <span className="field-label">Space</span>
+            <span className="field-label">Space *</span>
             <select className="field-input" value={form.space} onChange={set('space')}>
               {spaces.map((s) => (
                 <option key={s.id} value={s.id}>
@@ -296,13 +296,13 @@ export default function AddTransaction({ categories = [], cards = [], goals = []
       </div>
 
       <label className="field" style={{ marginTop: '0.75rem' }}>
-        <span className="field-label">Notes (optional)</span>
+        <span className="field-label">Notes</span>
         <textarea
           className="field-input"
           rows={2}
           value={form.description}
           onChange={set('description')}
-          placeholder="e.g. Hima's wedding gift, anniversary dinner…"
+          placeholder="e.g. wedding gift, anniversary dinner…"
         />
       </label>
 

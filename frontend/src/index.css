@@ -449,6 +449,12 @@ body {
   font-weight: 500;
 }
 
+.summary-sub {
+  margin-top: 0.3rem;
+  font-size: 0.7rem;
+  color: var(--faint);
+}
+
 .summary-value .sym {
   font-size: 0.8rem;
   color: var(--muted);
