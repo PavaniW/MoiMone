@@ -88,7 +88,7 @@ export default function Settings() {
       <div className="settings-list">
         <Link to="/cards" className="settings-row">
           <CardIcon />
-          <span className="settings-row-label">Cards</span>
+          <span className="settings-row-label">Accounts</span>
           <Chevron />
         </Link>
         <Link to="/categories" className="settings-row">

@@ -310,7 +310,7 @@ export default function Dashboard() {
       {/* Spending by card */}
       <div className="panel" style={{ marginTop: '1.5rem' }}>
         <div className="panel-head">
-          <h3 className="panel-title">By Card</h3>
+          <h3 className="panel-title">By Account</h3>
           <span className="panel-note">credit vs debit</span>
         </div>
         {byCard.length ? (
@@ -326,7 +326,7 @@ export default function Dashboard() {
             ))}
           </div>
         ) : (
-          <p className="panel-empty">No card spending recorded this month yet.</p>
+          <p className="panel-empty">No account spending recorded this month yet.</p>
         )}
       </div>
 

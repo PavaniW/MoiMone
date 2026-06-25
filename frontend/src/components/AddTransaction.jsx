@@ -159,6 +159,13 @@ export default function AddTransaction({ categories = [], cards = [], goals = []
         </button>
       </div>
 
+      {isTransfer && (
+        <p className="transfer-note">
+          Moves money between <strong>your own accounts</strong> — not paying someone else. Tag a goal
+          to record it as a saving.
+        </p>
+      )}
+
       <div className="field-grid">
         <label className="field">
           <span className="field-label">Amount</span>

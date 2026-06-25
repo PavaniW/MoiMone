@@ -7,8 +7,9 @@ import BackLink from '../components/BackLink.jsx';
 const SWATCHES = ['#2f6b4f', '#b0563c', '#45B7D1', '#DDA0DD', '#FFC857', '#4ECDC4'];
 const EMPTY = { nickname: '', bank: '', type: 'credit', last4: '', color: SWATCHES[0], balance: '' };
 
-// Cards manager — register your cards once; bank SMS auto-link by last 4 digits,
-// and manual entry lets you pick from these.
+// Accounts manager — cards, bank accounts and cash are all "accounts" (one
+// `cards` table). Register each once; bank SMS auto-link by last 4 digits,
+// manual entry and transfers let you pick from these.
 export default function Cards() {
   const [status, setStatus] = useState('loading');
   const [error, setError] = useState(null);
@@ -34,7 +35,7 @@ export default function Cards() {
   async function submit(e) {
     e.preventDefault();
     setError(null);
-    if (!form.nickname.trim()) return setError('Give the card a name.');
+    if (!form.nickname.trim()) return setError('Give the account a name.');
 
     setSaving(true);
     try {
@@ -74,7 +75,7 @@ export default function Cards() {
   }
 
   async function remove(id) {
-    if (!window.confirm('Delete this card? Past transactions keep their details; they just won’t be linked to a named card.')) {
+    if (!window.confirm('Delete this account? Past transactions keep their details; they just won’t be linked to a named account.')) {
       return;
     }
     const prev = cards;
@@ -87,11 +88,11 @@ export default function Cards() {
     }
   }
 
-  if (status === 'loading') return <Loading label="Loading cards…" />;
+  if (status === 'loading') return <Loading label="Loading accounts…" />;
   if (status === 'error') {
     return (
       <div className="dash-state">
-        <p className="dash-state-title">Couldn’t load cards</p>
+        <p className="dash-state-title">Couldn’t load accounts</p>
         <p className="dash-state-detail">{error}</p>
       </div>
     );
@@ -103,19 +104,20 @@ export default function Cards() {
       <header className="stmt-head">
         <div>
           <div className="stmt-eyebrow">Wallet</div>
-          <h2 className="stmt-title">Cards</h2>
+          <h2 className="stmt-title">Accounts</h2>
         </div>
         <span className="stmt-period num">{cards.length}</span>
       </header>
 
       <p className="setup-intro">
-        Register your cards once. Bank SMS auto-match to them by the last 4 digits, and manual
-        entry lets you pick a card — so spending is tracked per card across all your banks.
+        Your accounts — cards, bank accounts and cash. Register each once: bank SMS auto-match by
+        the last 4 digits, manual entry lets you pick one, and you can move money between them with
+        a Transfer. Spending and balances are tracked per account.
       </p>
 
       <div className="panel">
         <div className="panel-head">
-          <h3 className="panel-title">Add a Card</h3>
+          <h3 className="panel-title">Add an Account</h3>
         </div>
         <form className="entry-form" onSubmit={submit}>
           <div className="seg">
@@ -140,7 +142,7 @@ export default function Cards() {
                 type="text"
                 value={form.nickname}
                 onChange={set('nickname')}
-                placeholder="e.g. HSBC Visa"
+                placeholder="e.g. HSBC Visa, Sampath Savings, Cash"
               />
             </label>
             <label className="field">
@@ -196,7 +198,7 @@ export default function Cards() {
           {error && <p className="form-error">{error}</p>}
           <div className="form-actions">
             <button className="btn-primary" type="submit" disabled={saving}>
-              {saving ? <><Spinner size={14} />Saving…</> : 'Add card'}
+              {saving ? <><Spinner size={14} />Saving…</> : 'Add account'}
             </button>
           </div>
         </form>
@@ -211,7 +213,7 @@ export default function Cards() {
                   <span className="cat-dot" style={{ background: c.color || '#9A9384' }} />
                   {c.nickname}
                 </span>
-                <button className="row-del" title="Delete card" onClick={() => remove(c.id)}>
+                <button className="row-del" title="Delete account" onClick={() => remove(c.id)}>
                   ✕
                 </button>
               </div>
@@ -250,7 +252,7 @@ export default function Cards() {
           ))}
         </div>
       ) : (
-        <p className="panel-empty">No cards yet — add your first above.</p>
+        <p className="panel-empty">No accounts yet — add your first above.</p>
       )}
     </section>
   );
