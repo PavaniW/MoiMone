@@ -61,7 +61,6 @@ export default function AddTransaction({ categories = [], cards = [], goals = []
   const [remember, setRemember] = useState(false); // teach merchant → category
 
   const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
-  const isSavings = form.type === 'savings';
   const isTransfer = form.type === 'transfer';
 
   async function submit(e) {
@@ -72,9 +71,16 @@ export default function AddTransaction({ categories = [], cards = [], goals = []
       setError('Enter an amount.');
       return;
     }
-    if (isTransfer && (!form.from || !form.to || form.from === form.to)) {
-      setError('Pick two different accounts to transfer between.');
-      return;
+    if (isTransfer) {
+      if (form.from && form.to && form.from === form.to) {
+        setError('Pick two different accounts to transfer between.');
+        return;
+      }
+      // A transfer needs two accounts, or a goal to save toward (or both).
+      if (!form.goal && (!form.from || !form.to)) {
+        setError('Pick two accounts, or a goal to save toward.');
+        return;
+      }
     }
 
     const payload = {
@@ -85,12 +91,9 @@ export default function AddTransaction({ categories = [], cards = [], goals = []
     };
 
     if (isTransfer) {
-      payload.card_id = form.from;
-      payload.to_card_id = form.to;
+      payload.card_id = form.from || null;
+      payload.to_card_id = form.to || null;
       payload.goal_id = form.goal || null; // tagging a goal makes it a "saving"
-    } else if (isSavings) {
-      // Savings: set aside money, optionally linked to a goal. No card/category.
-      payload.goal_id = form.goal || null;
     } else {
       payload.merchant = form.merchant.trim() || null;
       payload.category = form.category;
@@ -147,12 +150,6 @@ export default function AddTransaction({ categories = [], cards = [], goals = []
         >
           Income
         </button>
-        {form.type === 'savings' && (
-          // Legacy savings entries stay editable; new ones use Transfer + Goal.
-          <button type="button" className="seg-btn active">
-            Savings
-          </button>
-        )}
         <button
           type="button"
           className={form.type === 'transfer' ? 'seg-btn active' : 'seg-btn'}
@@ -207,7 +204,7 @@ export default function AddTransaction({ categories = [], cards = [], goals = []
           </label>
         )}
 
-        {!isSavings && !isTransfer && (
+        {!isTransfer && (
           <label className="field">
             <span className="field-label">Merchant</span>
             <input
@@ -220,7 +217,7 @@ export default function AddTransaction({ categories = [], cards = [], goals = []
           </label>
         )}
 
-        {!isSavings && !isTransfer && (
+        {!isTransfer && (
           <label className="field">
             <span className="field-label">Category</span>
             <select className="field-input" value={form.category} onChange={set('category')}>
@@ -234,9 +231,9 @@ export default function AddTransaction({ categories = [], cards = [], goals = []
           </label>
         )}
 
-        {(isSavings || isTransfer) && (
+        {isTransfer && (
           <label className="field">
-            <span className="field-label">{isTransfer ? 'Goal (optional — makes it a saving)' : 'Goal (optional)'}</span>
+            <span className="field-label">Goal (optional — makes it a saving)</span>
             <select className="field-input" value={form.goal} onChange={set('goal')}>
               <option value="">— no goal —</option>
               {goals.map((g) => (
@@ -258,7 +255,7 @@ export default function AddTransaction({ categories = [], cards = [], goals = []
           />
         </label>
 
-        {!isSavings && !isTransfer && (
+        {!isTransfer && (
           <label className="field">
             <span className="field-label">Paid with</span>
             <select className="field-input" value={form.paidWith} onChange={set('paidWith')}>

@@ -5,7 +5,7 @@ import { userCategoryNames } from '../lib/categories.js';
 import { categoryForMerchant } from '../lib/merchant-rules.js';
 import { toLKR } from '../lib/fx.js';
 import { goalsForSpace, matchGoal, addToGoal } from '../lib/goals.js';
-import { setAccountBalance, bumpAccount } from '../lib/accounts.js';
+import { setAccountBalance, bumpAccount, userAccounts, matchAccountByName } from '../lib/accounts.js';
 import { supabase } from '../lib/supabase.js';
 import { monthRange, currentPeriod } from '../lib/period.js';
 import { userByWhatsApp, matchUserCard } from '../lib/ingest.js';
@@ -81,7 +81,7 @@ async function weeklySummaryLine(spaceId) {
   const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   const { data } = await supabase
     .from('transactions')
-    .select('amount, type, category')
+    .select('amount, type, category, goal_id')
     .eq('space_id', spaceId)
     .gte('transaction_date', since);
 
@@ -90,11 +90,11 @@ async function weeklySummaryLine(spaceId) {
   const byCat = {};
   for (const t of data || []) {
     const a = Number(t.amount);
-    if (t.type === 'savings') {
-      saved += a;
-      continue;
+    if (t.type === 'transfer') {
+      if (t.goal_id) saved += a; // goal-tagged transfer = a saving
+      continue; // plain transfers just move money between accounts
     }
-    if (t.type !== 'expense') continue; // skip income + transfers
+    if (t.type !== 'expense') continue; // skip income
     spent += a;
     byCat[t.category] = (byCat[t.category] || 0) + a;
   }
@@ -132,44 +132,70 @@ router.post('/whatsapp', authenticate, async (req, res) => {
 
     const categories = await userCategoryNames(who.userId);
     const goals = await goalsForSpace(who.spaceId);
-    const parsed = await parseTransaction(body, { categories, goals: goals.map((g) => g.name) });
-
-    const isSavings = parsed.type === 'savings';
-    const goal = isSavings ? matchGoal(goals, parsed.goal) : null;
-
-    // Learned merchant rule overrides the LLM's category guess (non-savings only).
-    let category = parsed.category;
-    if (!isSavings) {
-      const learned = await categoryForMerchant(who.userId, parsed.merchant);
-      if (learned) category = learned;
-    }
-
-    const card = isSavings ? null : await matchUserCard(who.userId, parsed.card_last4);
+    const accounts = await userAccounts(who.userId);
+    const parsed = await parseTransaction(body, {
+      categories,
+      goals: goals.map((g) => g.name),
+      accounts: accounts.map((a) => a.nickname),
+    });
 
     // Convert foreign-currency amounts to LKR (we store everything in LKR).
     const fx = await toLKR(parsed.amount, parsed.currency);
     const amount = fx ? fx.lkr : parsed.amount;
+    const orig = fx ? ` (${fx.currency} ${fx.original})` : '';
+    const description = fx ? `Originally ${fx.currency} ${fx.original}` : null;
+    const base = { amount, description, source: 'whatsapp', raw_text: body, created_by: who.userId, space_id: who.spaceId };
+    const dated = parsed.date ? { transaction_date: parsed.date } : {};
+
+    // --- Transfer: between accounts and/or toward a goal (a "saving") ---
+    if (parsed.type === 'transfer') {
+      const goal = matchGoal(goals, parsed.goal);
+      const fromAcct = matchAccountByName(accounts, parsed.from_account);
+      const toAcct = matchAccountByName(accounts, parsed.to_account);
+      const { error } = await supabase.from('transactions').insert({
+        ...base,
+        ...dated,
+        type: 'transfer',
+        category: 'Transfer',
+        merchant: null,
+        payment_method: null,
+        card_last4: null,
+        card_id: fromAcct?.id ?? null,
+        to_card_id: toAcct?.id ?? null,
+        goal_id: goal?.id ?? null,
+      });
+      if (error) throw new Error(error.message);
+      if (fromAcct) await bumpAccount(fromAcct.id, -amount, who.userId);
+      if (toAcct) await bumpAccount(toAcct.id, amount, who.userId);
+      if (goal) await addToGoal(goal.id, amount, who.spaceId);
+
+      if (goal) {
+        return reply(res, `💰 Saved ${DEFAULT_CURRENCY} ${amount}${orig} toward ${goal.name}.`);
+      }
+      const route = fromAcct && toAcct ? ` (${fromAcct.nickname} → ${toAcct.nickname})` : '';
+      return reply(res, `🔁 Transferred ${DEFAULT_CURRENCY} ${amount}${orig}${route}.`);
+    }
+
+    // --- Expense / income ---
+    // Learned merchant rule overrides the LLM's category guess.
+    let category = parsed.category;
+    const learned = await categoryForMerchant(who.userId, parsed.merchant);
+    if (learned) category = learned;
+
+    const card = await matchUserCard(who.userId, parsed.card_last4);
 
     const { error } = await supabase.from('transactions').insert({
-      amount,
+      ...base,
+      ...dated,
       type: parsed.type,
-      category: isSavings ? 'Savings' : category,
-      merchant: isSavings ? null : parsed.merchant,
-      description: fx ? `Originally ${fx.currency} ${fx.original}` : null,
-      payment_method: isSavings ? null : card ? card.type : parsed.payment_method,
-      card_last4: isSavings ? null : parsed.card_last4,
-      card_id: isSavings ? null : card ? card.id : null,
-      goal_id: isSavings ? (goal ? goal.id : null) : null,
-      source: 'whatsapp',
-      raw_text: body,
-      created_by: who.userId,
-      space_id: who.spaceId, // user's private space
-      // Use the date from the message when the parser found one; else default now().
-      ...(parsed.date ? { transaction_date: parsed.date } : {}),
+      category,
+      merchant: parsed.merchant,
+      payment_method: card ? card.type : parsed.payment_method,
+      card_last4: parsed.card_last4,
+      card_id: card ? card.id : null,
+      goal_id: null,
     });
     if (error) throw new Error(error.message);
-
-    const orig = fx ? ` (${fx.currency} ${fx.original})` : '';
 
     // Keep the linked account's balance fresh (same rule as the SMS webhook).
     if (card) {
@@ -180,12 +206,6 @@ router.post('/whatsapp', authenticate, async (req, res) => {
       } else if (parsed.type === 'expense') {
         await bumpAccount(card.id, -amount, who.userId);
       }
-    }
-
-    if (isSavings) {
-      if (goal) await addToGoal(goal.id, amount, who.spaceId);
-      const toGoal = goal ? ` toward ${goal.name}` : '';
-      return reply(res, `💰 Saved ${DEFAULT_CURRENCY} ${amount}${orig}${toGoal}.`);
     }
 
     const merchant =

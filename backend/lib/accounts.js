@@ -28,6 +28,34 @@ export async function setAccountBalance(cardId, balance, userId) {
     .eq('user_id', userId);
 }
 
+// The user's accounts as {id, nickname, bank, type}, for name-matching a parsed
+// transfer ("from HSBC to Sampath") back to real account ids.
+export async function userAccounts(userId) {
+  const { data } = await supabase
+    .from('cards')
+    .select('id, nickname, bank, type')
+    .eq('user_id', userId);
+  return data || [];
+}
+
+// Match a free-text account name to one of the user's accounts. Case-insensitive:
+// exact nickname/bank first, then substring either direction (so "HSBC" finds
+// "HSBC Visa"). Returns the account row or null.
+export function matchAccountByName(accounts, name) {
+  const q = String(name ?? '').trim().toLowerCase();
+  if (!q) return null;
+  const norm = (s) => String(s || '').trim().toLowerCase();
+  let hit = accounts.find((a) => norm(a.nickname) === q || norm(a.bank) === q);
+  if (hit) return hit;
+  return (
+    accounts.find((a) => {
+      const n = norm(a.nickname);
+      const b = norm(a.bank);
+      return (n && (n.includes(q) || q.includes(n))) || (b && (b.includes(q) || q.includes(b)));
+    }) || null
+  );
+}
+
 // Ensure the user has a "Cash" account; returns its id. Seeded on first access.
 export async function ensureCashAccount(userId) {
   const { data } = await supabase

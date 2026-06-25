@@ -6,7 +6,7 @@ import { userCategoryNames } from '../lib/categories.js';
 import { categoryForMerchant } from '../lib/merchant-rules.js';
 import { toLKR } from '../lib/fx.js';
 import { goalsForSpace, matchGoal, addToGoal } from '../lib/goals.js';
-import { setAccountBalance, bumpAccount } from '../lib/accounts.js';
+import { setAccountBalance, bumpAccount, userAccounts, matchAccountByName } from '../lib/accounts.js';
 
 const router = Router();
 
@@ -30,51 +30,74 @@ router.post('/sms', async (req, res, next) => {
 
     const categories = await userCategoryNames(who.userId);
     const goals = await goalsForSpace(who.spaceId);
-    const parsed = await parseTransaction(text, { categories, goals: goals.map((g) => g.name) });
-
-    const isSavings = parsed.type === 'savings';
-    const goal = isSavings ? matchGoal(goals, parsed.goal) : null;
-
-    // Learned merchant rule overrides the LLM's category guess (non-savings only).
-    let category = parsed.category;
-    if (!isSavings) {
-      const learned = await categoryForMerchant(who.userId, parsed.merchant);
-      if (learned) category = learned;
-    }
-
-    // Auto-link to one of the user's registered cards by last 4 digits.
-    const card = isSavings ? null : await matchUserCard(who.userId, parsed.card_last4);
+    const accounts = await userAccounts(who.userId);
+    const parsed = await parseTransaction(text, {
+      categories,
+      goals: goals.map((g) => g.name),
+      accounts: accounts.map((a) => a.nickname),
+    });
 
     // Convert foreign-currency amounts to LKR (we store everything in LKR).
     const fx = await toLKR(parsed.amount, parsed.currency);
     const amount = fx ? fx.lkr : parsed.amount;
+    const description = fx ? `Originally ${fx.currency} ${fx.original}` : null;
+    const base = { amount, description, source: 'sms', raw_text: text, created_by: who.userId, space_id: who.spaceId };
+    const dated = parsed.date ? { transaction_date: parsed.date } : {};
+
+    // --- Transfer: between accounts and/or toward a goal (a "saving") ---
+    if (parsed.type === 'transfer') {
+      const goal = matchGoal(goals, parsed.goal);
+      const fromAcct = matchAccountByName(accounts, parsed.from_account);
+      const toAcct = matchAccountByName(accounts, parsed.to_account);
+      const { data, error } = await supabase
+        .from('transactions')
+        .insert({
+          ...base,
+          ...dated,
+          type: 'transfer',
+          category: 'Transfer',
+          merchant: null,
+          payment_method: null,
+          card_last4: null,
+          card_id: fromAcct?.id ?? null,
+          to_card_id: toAcct?.id ?? null,
+          goal_id: goal?.id ?? null,
+        })
+        .select()
+        .single();
+      if (error) throw new Error(`Supabase insert failed: ${error.message}`);
+      if (fromAcct) await bumpAccount(fromAcct.id, -amount, who.userId);
+      if (toAcct) await bumpAccount(toAcct.id, amount, who.userId);
+      if (goal) await addToGoal(goal.id, amount, who.spaceId);
+      return res.status(201).json({ transaction: data, parsed });
+    }
+
+    // --- Expense / income ---
+    // Learned merchant rule overrides the LLM's category guess.
+    let category = parsed.category;
+    const learned = await categoryForMerchant(who.userId, parsed.merchant);
+    if (learned) category = learned;
+
+    // Auto-link to one of the user's registered cards by last 4 digits.
+    const card = await matchUserCard(who.userId, parsed.card_last4);
 
     const { data, error } = await supabase
       .from('transactions')
       .insert({
-        amount,
+        ...base,
+        ...dated,
         type: parsed.type,
-        category: isSavings ? 'Savings' : category,
-        merchant: isSavings ? null : parsed.merchant,
-        description: fx ? `Originally ${fx.currency} ${fx.original}` : null,
-        payment_method: isSavings ? null : card ? card.type : parsed.payment_method,
-        card_last4: isSavings ? null : parsed.card_last4,
-        card_id: isSavings ? null : card ? card.id : null,
-        goal_id: isSavings ? (goal ? goal.id : null) : null,
-        source: 'sms',
-        raw_text: text,
-        created_by: who.userId,
-        space_id: who.spaceId, // always the user's private space (never shared)
-        // Use the date from the message when the parser found one; else default now().
-        ...(parsed.date ? { transaction_date: parsed.date } : {}),
+        category,
+        merchant: parsed.merchant,
+        payment_method: card ? card.type : parsed.payment_method,
+        card_last4: parsed.card_last4,
+        card_id: card ? card.id : null,
+        goal_id: null,
       })
       .select()
       .single();
 
     if (error) throw new Error(`Supabase insert failed: ${error.message}`);
-
-    // A linked saving contributes to the goal's progress.
-    if (isSavings && goal) await addToGoal(goal.id, amount, who.spaceId);
 
     // Keep the linked account's balance fresh: the SMS "available balance" is
     // authoritative; otherwise adjust incrementally by the transaction.

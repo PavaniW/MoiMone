@@ -129,16 +129,15 @@ export default function Transactions() {
 
   const reviewCount = useMemo(() => rows.filter(isReview).length, [rows]);
 
-  // Net = what's left in hand: income − expense − savings (savings is money
-  // moved out of spendable cash, so it reduces the net too).
+  // Net = what's left in hand: income − expense − savings. A plain transfer just
+  // moves between your own accounts (net 0); a goal-tagged transfer is a saving,
+  // so it leaves spendable cash.
   const total = useMemo(
     () =>
       filtered.reduce((sum, t) => {
         if (t.type === 'income') return sum + Number(t.amount);
-        // A plain transfer just moves between your own accounts (net 0); but a
-        // goal-tagged transfer is a saving, so it leaves spendable cash.
         if (t.type === 'transfer') return t.goal_id ? sum - Number(t.amount) : sum;
-        return sum - Number(t.amount); // expense + savings reduce money in hand
+        return sum - Number(t.amount); // expense reduces money in hand
       }, 0),
     [filtered]
   );
@@ -247,7 +246,6 @@ export default function Transactions() {
           <option value="">All types</option>
           <option value="expense">Expense</option>
           <option value="income">Income</option>
-          <option value="savings">Savings</option>
           <option value="transfer">Transfer</option>
         </select>
         <select className="field-input" value={source} onChange={(e) => setSource(e.target.value)}>
@@ -308,20 +306,15 @@ export default function Transactions() {
             </div>
             {filtered.map((t) => {
               const isIncome = t.type === 'income';
-              // A goal-tagged transfer is a saving; treat it like one for display.
-              const isGoalTransfer = t.type === 'transfer' && t.goal_id;
-              const isSaving = t.type === 'savings' || isGoalTransfer;
-              const isTransfer = t.type === 'transfer' && !isGoalTransfer;
-              const label = isTransfer || isGoalTransfer ? '' : cardLabel(t, cardsById);
-              const name = isGoalTransfer
+              // A goal-tagged transfer is a saving; a plain transfer moves money.
+              const isSaving = t.type === 'transfer' && t.goal_id;
+              const isTransfer = t.type === 'transfer' && !t.goal_id;
+              const label = t.type === 'transfer' ? '' : cardLabel(t, cardsById);
+              const name = isSaving
                 ? `Savings → ${t.goal?.name || 'Goal'}`
-                : t.type === 'savings'
-                  ? t.goal?.name
-                    ? `Savings → ${t.goal.name}`
-                    : 'Savings'
-                  : isTransfer
-                    ? `Transfer: ${t.card?.nickname || '—'} → ${t.to_account?.nickname || '—'}`
-                    : t.merchant || '—';
+                : isTransfer
+                  ? `Transfer: ${t.card?.nickname || '—'} → ${t.to_account?.nickname || '—'}`
+                  : t.merchant || '—';
               return (
                 <div className="ledger-row edit body" key={t.id}>
                   <span className="ledger-date num">{formatDay(t.transaction_date)}</span>

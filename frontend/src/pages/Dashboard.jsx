@@ -40,7 +40,7 @@ function build(categories, cards, windowTxns, recentTxns, budgetRows, period) {
     const amount = Number(t.amount);
     if (t.type === 'income') {
       income += amount;
-    } else if (t.type === 'savings' || (t.type === 'transfer' && t.goal_id)) {
+    } else if (t.type === 'transfer' && t.goal_id) {
       saved += amount;
     } else if (t.type === 'expense') {
       spent += amount;

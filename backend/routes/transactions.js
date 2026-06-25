@@ -39,10 +39,11 @@ function badRequest(message) {
   return err;
 }
 
-const TYPES = ['expense', 'income', 'savings', 'transfer'];
+const TYPES = ['expense', 'income', 'transfer'];
 
 // A transaction "feeds a goal" when it's a saving OR a goal-tagged transfer.
-const feedsGoal = (t) => (t.type === 'savings' || t.type === 'transfer') && t.goal_id;
+// A "saving" is a transfer tagged with a goal — that's what feeds goal progress.
+const feedsGoal = (t) => t.type === 'transfer' && t.goal_id;
 
 // Apply (sign +1) or reverse (sign -1) a transaction's effect on account balances.
 // expense lowers its account, income raises it, transfer moves between accounts.
@@ -70,7 +71,7 @@ async function resolveGoalId(req, goalId) {
   return data.id;
 }
 
-// Adjust a goal's saved amount by delta (savings transactions feed goal progress).
+// Adjust a goal's saved amount by delta (goal-tagged transfers feed goal progress).
 async function bumpGoal(goalId, delta, spaceIds) {
   if (!goalId || !delta) return;
   const { data: g } = await supabase
@@ -93,7 +94,7 @@ router.get('/', async (req, res, next) => {
     let query = supabase
       .from('transactions')
       // Embed the linked card (resolves a partner's card in a shared space) and
-      // the linked goal (so savings rows can show "Savings → <goal>").
+      // the linked goal (so a goal-tagged transfer shows "Savings → <goal>").
       .select('*, card:cards!card_id(nickname, last4, color, type), to_account:cards!to_card_id(nickname), goal:goals(name)')
       .in('space_id', req.spaceIds) // only spaces this user belongs to
       .order('transaction_date', { ascending: false });
@@ -132,17 +133,20 @@ router.post('/', async (req, res, next) => {
 
     const value = Math.abs(Number(amount));
     if (!value) throw badRequest('amount must be a non-zero number');
-    if (!TYPES.includes(type)) throw badRequest("type must be 'expense', 'income', 'savings' or 'transfer'");
+    if (!TYPES.includes(type)) throw badRequest("type must be 'expense', 'income' or 'transfer'");
 
-    // --- Transfer: move money between two of the user's accounts ---
+    // --- Transfer: move money between accounts and/or set it aside for a goal ---
+    // A transfer must specify two distinct accounts, or a goal to save toward
+    // (or both). Goal-only = a savings earmark; accounts-only = a plain transfer.
     if (type === 'transfer') {
-      const toId = req.body?.to_card_id;
-      if (!card_id || !toId) throw badRequest('a transfer needs a from and a to account');
-      if (card_id === toId) throw badRequest('the from and to accounts must be different');
-      await resolveCard(req, card_id); // validate ownership of both
-      await resolveCard(req, toId);
-      // A transfer can be tagged with a goal — that's how "saving" is recorded.
+      const toId = req.body?.to_card_id || null;
       const goalId = await resolveGoalId(req, req.body?.goal_id);
+      if (!goalId && (!card_id || !toId)) {
+        throw badRequest('a transfer needs two accounts, or a goal to save toward');
+      }
+      if (card_id && toId && card_id === toId) throw badRequest('the from and to accounts must be different');
+      if (card_id) await resolveCard(req, card_id); // validate ownership where given
+      if (toId) await resolveCard(req, toId);
       const trow = {
         amount: value,
         type: 'transfer',
@@ -150,7 +154,7 @@ router.post('/', async (req, res, next) => {
         merchant: null,
         description: description ? String(description).trim() : null,
         payment_method: null,
-        card_id, // from
+        card_id: card_id || null, // from
         to_card_id: toId, // to
         goal_id: goalId,
         source: 'manual',
@@ -165,18 +169,16 @@ router.post('/', async (req, res, next) => {
       return res.status(201).json(data);
     }
 
+    // --- Expense / income ---
     if (payment_method != null && payment_method !== '' && !PAYMENT_METHODS.includes(payment_method)) {
       throw badRequest(`payment_method must be one of: ${PAYMENT_METHODS.join(', ')}`);
     }
 
-    const isSavings = type === 'savings';
-    // Savings are money set aside (no card), optionally feeding a goal.
-    const goalId = isSavings ? await resolveGoalId(req, req.body?.goal_id) : null;
-    const cat = isSavings ? String(category || '').trim() || 'Savings' : String(category || '').trim();
+    const cat = String(category || '').trim();
     if (!cat) throw badRequest('category is required');
 
     // A chosen card sets the method + last4; otherwise use the raw fields (cash/other).
-    const card = isSavings ? null : await resolveCard(req, card_id);
+    const card = await resolveCard(req, card_id);
 
     const row = {
       amount: value,
@@ -184,10 +186,10 @@ router.post('/', async (req, res, next) => {
       category: cat,
       merchant: merchant ? String(merchant).trim() : null,
       description: description ? String(description).trim() : null,
-      payment_method: isSavings ? null : card ? card.type : payment_method || null,
-      card_last4: isSavings ? null : card ? card.last4 : cleanLast4(card_last4),
-      card_id: isSavings ? null : card ? card.id : null,
-      goal_id: goalId,
+      payment_method: card ? card.type : payment_method || null,
+      card_last4: card ? card.last4 : cleanLast4(card_last4),
+      card_id: card ? card.id : null,
+      goal_id: null, // only transfers feed goals
       source: 'manual',
       space_id: targetSpace(req, req.body?.space_id),
       created_by: req.user.id,
@@ -197,8 +199,6 @@ router.post('/', async (req, res, next) => {
     const { data, error } = await supabase.from('transactions').insert(row).select().single();
     if (error) throw new Error(error.message);
 
-    // Linked savings contribute to the goal's progress.
-    if (isSavings && goalId) await bumpGoal(goalId, value, req.spaceIds);
     // Expense/income adjust the linked account's balance.
     await applyBalanceEffect(data, +1, req.user.id);
 
@@ -233,7 +233,7 @@ router.put('/:id', async (req, res, next) => {
       updates.amount = value;
     }
     if (type !== undefined) {
-      if (!TYPES.includes(type)) throw badRequest("type must be 'expense', 'income' or 'savings'");
+      if (!TYPES.includes(type)) throw badRequest("type must be 'expense', 'income' or 'transfer'");
       updates.type = type;
     }
     if (category !== undefined) {
@@ -272,16 +272,9 @@ router.put('/:id', async (req, res, next) => {
     }
     if (req.body?.space_id !== undefined) updates.space_id = targetSpace(req, req.body.space_id);
 
-    // Resolve the post-update type. Savings/transfer may hold a goal; income/
-    // expense may not. Savings has no card; transfer keeps its from/to cards.
+    // Only transfers may hold a goal; income/expense never do.
     const finalType = updates.type ?? old.type;
-    if (finalType === 'savings') {
-      updates.card_id = null;
-      updates.payment_method = null;
-      updates.card_last4 = null;
-    } else if (finalType !== 'transfer') {
-      updates.goal_id = null; // income/expense don't link goals
-    }
+    if (finalType !== 'transfer') updates.goal_id = null;
 
     if (!Object.keys(updates).length) throw badRequest('no fields to update');
 
@@ -296,7 +289,7 @@ router.put('/:id', async (req, res, next) => {
     if (!data) return res.status(404).json({ error: 'Transaction not found' });
 
     // Re-sync goal progress: remove the old contribution, add the new one
-    // (savings or goal-tagged transfers feed a goal).
+    // (goal-tagged transfers feed a goal).
     if (feedsGoal(old)) await bumpGoal(old.goal_id, -Number(old.amount), req.spaceIds);
     if (feedsGoal(data)) await bumpGoal(data.goal_id, Number(data.amount), req.spaceIds);
 

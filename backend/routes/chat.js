@@ -18,7 +18,7 @@ function summarize(rows) {
     const amt = Number(t.amount) || 0;
     if (t.type === 'income') {
       totalIncome += amt;
-    } else if (t.type === 'savings' || (t.type === 'transfer' && t.goal_id)) {
+    } else if (t.type === 'transfer' && t.goal_id) {
       totalSaved += amt;
     } else if (t.type === 'expense') {
       totalExpense += amt;

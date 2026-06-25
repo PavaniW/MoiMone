@@ -4,8 +4,14 @@ import { formatAmount, formatDay, CURRENCY } from '../lib/format.js';
 export default function TransactionItem({ transaction }) {
   const { transaction_date, merchant, category, source, type, amount, color } = transaction;
   const isIncome = type === 'income';
-  const isSaving = type === 'savings';
-  const name = isSaving ? (transaction.goal?.name ? `Savings → ${transaction.goal.name}` : 'Savings') : merchant || '—';
+  // A saving is a goal-tagged transfer; a plain transfer just moves money.
+  const isSaving = type === 'transfer' && transaction.goal_id;
+  const isTransfer = type === 'transfer' && !transaction.goal_id;
+  const name = isSaving
+    ? `Savings → ${transaction.goal?.name || 'Goal'}`
+    : isTransfer
+      ? 'Transfer'
+      : merchant || '—';
 
   return (
     <div className="ledger-row body">
@@ -16,8 +22,8 @@ export default function TransactionItem({ transaction }) {
       </span>
       <span className="ledger-cat">{category}</span>
       <span className="src-tag">{source}</span>
-      <span className={`ledger-amount ${isIncome ? 'income' : isSaving ? 'saved' : 'expense'}`}>
-        {isIncome ? '+' : isSaving ? '⇢' : '−'}
+      <span className={`ledger-amount ${isIncome ? 'income' : isSaving ? 'saved' : isTransfer ? 'transfer' : 'expense'}`}>
+        {isIncome ? '+' : isSaving ? '⇢' : isTransfer ? '⇄' : '−'}
         <span className="sym">{CURRENCY}</span>
         {formatAmount(amount)}
       </span>
