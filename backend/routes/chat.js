@@ -31,7 +31,9 @@ function summarize(rows) {
     totalIncome: round(totalIncome),
     totalExpense: round(totalExpense),
     totalSaved: round(totalSaved),
-    available: round(totalIncome - totalExpense - totalSaved),
+    // Net flow for the month (income − spent − saved). NOT a balance — the
+    // spendable balance is availableNow, computed from real account balances.
+    net: round(totalIncome - totalExpense - totalSaved),
     byCategory: rounded,
   };
 }
@@ -91,9 +93,23 @@ async function buildContext(req, spaceIds) {
 
   const monthLabel = (m, y) => `${String(m).padStart(2, '0')}/${y}`;
 
+  // Live account balances (scoped to the user). "Available now" = spendable
+  // accounts (debit + cash), matching the dashboard's Available figure exactly.
+  const { data: cardRows, error: cErr } = await supabase
+    .from('cards')
+    .select('nickname, type, balance')
+    .eq('user_id', req.user.id);
+  if (cErr) throw new Error(cErr.message);
+  const accounts = (cardRows || []).map((c) => ({ name: c.nickname, type: c.type, balance: round(c.balance) }));
+  const availableNow = round(
+    accounts.filter((a) => a.type === 'debit' || a.type === 'cash').reduce((s, a) => s + a.balance, 0)
+  );
+
   return {
     today: new Date().toISOString().slice(0, 10),
     currency: DEFAULT_CURRENCY,
+    availableNow, // spendable right now (debit + cash) — use this for "how much do I have"
+    accounts,
     thisMonth: { label: monthLabel(month, year), ...thisSummary },
     lastMonth: { label: monthLabel(prevMonth, prevYear), ...summarize(lastMonthTx) },
     budgets,
