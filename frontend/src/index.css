@@ -1071,13 +1071,6 @@ body {
   min-width: 0;
 }
 
-.budget-with-del {
-  display: grid;
-  grid-template-columns: 1fr 36px;
-  align-items: center;
-  gap: 0.5rem;
-}
-
 .swatches {
   display: flex;
   gap: 0.4rem;
@@ -1779,32 +1772,6 @@ body {
   color: var(--muted);
   min-width: 7.5rem;
   text-align: center;
-}
-
-/* ---------- Dashboard: total monthly budget ---------- */
-.total-budget {
-  margin-top: 1.25rem;
-}
-.tb-track {
-  height: 10px;
-  background: var(--bar);
-  border-radius: 999px;
-  overflow: hidden;
-  margin-top: 0.4rem;
-}
-.tb-fill {
-  height: 100%;
-  background: var(--green);
-  border-radius: 999px;
-  transition: width 0.3s;
-}
-.tb-fill.over {
-  background: var(--sienna);
-}
-.tb-nudge {
-  margin: 0.55rem 0 0;
-  color: var(--sienna);
-  font-size: 0.82rem;
 }
 
 /* ---------- Dashboard: 6-month trend ---------- */
