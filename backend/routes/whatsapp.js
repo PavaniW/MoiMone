@@ -5,7 +5,7 @@ import { userCategoryNames } from '../lib/categories.js';
 import { categoryForMerchant } from '../lib/merchant-rules.js';
 import { toLKR } from '../lib/fx.js';
 import { goalsForSpace, matchGoal, addToGoal } from '../lib/goals.js';
-import { setAccountBalance, bumpAccount, userAccounts, matchAccountByName } from '../lib/accounts.js';
+import { setAccountBalance, bumpAccount, userAccounts, matchAccountByName, ensureCashAccount } from '../lib/accounts.js';
 import { supabase } from '../lib/supabase.js';
 import { monthRange, currentPeriod } from '../lib/period.js';
 import { userByWhatsApp, matchUserCard } from '../lib/ingest.js';
@@ -182,7 +182,11 @@ router.post('/whatsapp', authenticate, async (req, res) => {
     const learned = await categoryForMerchant(who.userId, parsed.merchant);
     if (learned) category = learned;
 
-    const card = await matchUserCard(who.userId, parsed.card_last4);
+    let card = await matchUserCard(who.userId, parsed.card_last4);
+    // Cash spending links to the user's Cash account so its balance stays accurate.
+    if (!card && parsed.payment_method === 'cash') {
+      card = { id: await ensureCashAccount(who.userId), type: 'cash', last4: null };
+    }
 
     const { error } = await supabase.from('transactions').insert({
       ...base,
