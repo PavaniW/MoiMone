@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import BudgetBar from '../components/BudgetBar.jsx';
+import BudgetCard from '../components/BudgetCard.jsx';
 import Loading, { Spinner } from '../components/Loading.jsx';
 import { formatAmount, CURRENCY } from '../lib/format.js';
 import { api } from '../lib/api.js';
@@ -108,6 +108,18 @@ export default function Budgets() {
     }
   }
 
+  // Inline edit of a category's monthly limit (upsert keeps the same row).
+  async function editLimit(budget, monthly_limit) {
+    await api.upsertBudget({
+      category: budget.category,
+      monthly_limit,
+      month: PERIOD.month,
+      year: PERIOD.year,
+      space_id: currentSpaceId,
+    });
+    await load();
+  }
+
   async function remove(id) {
     const prev = budgets;
     setBudgets((bs) => bs.filter((b) => b.id !== id));
@@ -192,27 +204,9 @@ export default function Budgets() {
             <span className="panel-note">{decorated.length} set</span>
           </div>
           {decorated.length ? (
-            <div className="budget-list">
+            <div className="goal-grid">
               {decorated.map((b) => (
-                <div className="budget-with-del" key={b.id}>
-                  <BudgetBar {...b} />
-                  <button
-                    className="row-edit"
-                    title="Edit limit"
-                    onClick={() => {
-                      selectCategory(b.category);
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                    }}
-                  >
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M12 20h9" />
-                      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z" />
-                    </svg>
-                  </button>
-                  <button className="row-del" title="Delete budget" onClick={() => remove(b.id)}>
-                    ✕
-                  </button>
-                </div>
+                <BudgetCard key={b.id} budget={b} onEdit={editLimit} onDelete={remove} />
               ))}
             </div>
           ) : (

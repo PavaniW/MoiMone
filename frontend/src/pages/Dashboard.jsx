@@ -75,8 +75,6 @@ function build(categories, cards, windowTxns, recentTxns, budgetRows, period) {
     spent: Number(b.spent),
     color: colorOf[b.category] || FALLBACK_COLOR,
   }));
-  const totalBudget = budgets.reduce((s, b) => s + b.monthly_limit, 0);
-  const overCount = budgets.filter((b) => b.spent > b.monthly_limit).length;
 
   // 6-month expense trend, oldest → selected month.
   const trend = [];
@@ -107,8 +105,6 @@ function build(categories, cards, windowTxns, recentTxns, budgetRows, period) {
     summary: { spent, income, saved, available },
     spendByCategory,
     budgets,
-    totalBudget,
-    overCount,
     trend,
     recent,
     byCard,
@@ -173,10 +169,9 @@ export default function Dashboard() {
     );
   }
 
-  const { accounts, summary, spendByCategory, budgets, totalBudget, overCount, trend, recent, byCard } = state.data;
+  const { accounts, summary, spendByCategory, budgets, trend, recent, byCard } = state.data;
   const cardMax = byCard.reduce((m, c) => Math.max(m, c.amount), 0);
   const trendMax = trend.reduce((m, t) => Math.max(m, t.amount), 0);
-  const budgetPct = totalBudget ? Math.min(100, (summary.spent / totalBudget) * 100) : 0;
 
   return (
     <section>
@@ -238,24 +233,6 @@ export default function Dashboard() {
               </div>
             ))}
           </div>
-        </div>
-      )}
-
-      {/* Total monthly budget */}
-      {totalBudget > 0 && (
-        <div className="panel total-budget">
-          <div className="panel-head">
-            <h3 className="panel-title">Monthly Budget</h3>
-            <span className="panel-note num">
-              {CURRENCY} {formatAmount(summary.spent)} of {CURRENCY} {formatAmount(totalBudget)}
-            </span>
-          </div>
-          <div className="tb-track">
-            <div className={`tb-fill ${summary.spent > totalBudget ? 'over' : ''}`} style={{ width: `${budgetPct}%` }} />
-          </div>
-          {overCount > 0 && (
-            <p className="tb-nudge">⚠ {overCount} {overCount === 1 ? 'category is' : 'categories are'} over budget</p>
-          )}
         </div>
       )}
 
