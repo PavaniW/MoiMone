@@ -84,6 +84,12 @@ router.post('/sms', async (req, res, next) => {
     if (!card && parsed.payment_method === 'cash') {
       card = { id: await ensureCashAccount(who.userId), type: 'cash', last4: null };
     }
+    // No card number, but the message named a card type ("from debit card"):
+    // link to the user's sole account of that type so its balance updates.
+    if (!card && (parsed.payment_method === 'debit' || parsed.payment_method === 'credit')) {
+      const matches = (await userAccounts(who.userId)).filter((a) => a.type === parsed.payment_method);
+      if (matches.length === 1) card = matches[0];
+    }
 
     const { data, error } = await supabase
       .from('transactions')
