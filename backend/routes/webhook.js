@@ -6,7 +6,7 @@ import { userCategoryNames } from '../lib/categories.js';
 import { categoryForMerchant } from '../lib/merchant-rules.js';
 import { toLKR } from '../lib/fx.js';
 import { goalsForSpace, matchGoal, addToGoal } from '../lib/goals.js';
-import { setAccountBalance, bumpAccount, userAccounts, matchAccountByName, ensureCashAccount } from '../lib/accounts.js';
+import { setCardBalance, userAccounts, matchAccountByName, ensureCashAccount } from '../lib/accounts.js';
 
 const router = Router();
 
@@ -66,8 +66,7 @@ router.post('/sms', async (req, res, next) => {
         .select()
         .single();
       if (error) throw new Error(`Supabase insert failed: ${error.message}`);
-      if (fromAcct) await bumpAccount(fromAcct.id, -amount, who.userId);
-      if (toAcct) await bumpAccount(toAcct.id, amount, who.userId);
+      // Account balances are derived from the records; only goal progress is tracked.
       if (goal) await addToGoal(goal.id, amount, who.spaceId);
       return res.status(201).json({ transaction: data, parsed });
     }
@@ -109,16 +108,11 @@ router.post('/sms', async (req, res, next) => {
 
     if (error) throw new Error(`Supabase insert failed: ${error.message}`);
 
-    // Keep the linked account's balance fresh: the SMS "available balance" is
-    // authoritative; otherwise adjust incrementally by the transaction.
-    if (card) {
-      if (parsed.account_balance != null) {
-        await setAccountBalance(card.id, parsed.account_balance, who.userId);
-      } else if (parsed.type === 'income') {
-        await bumpAccount(card.id, amount, who.userId);
-      } else if (parsed.type === 'expense') {
-        await bumpAccount(card.id, -amount, who.userId);
-      }
+    // Balance is derived from the transaction itself. Only an SMS-stated
+    // "available balance" needs action — reconcile the account to the bank's
+    // figure (it's authoritative).
+    if (card && parsed.account_balance != null) {
+      await setCardBalance(card.id, parsed.account_balance, who.userId);
     }
 
     res.status(201).json({ transaction: data, parsed });

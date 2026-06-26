@@ -3,7 +3,6 @@ import { supabase } from '../lib/supabase.js';
 import { monthRange } from '../lib/period.js';
 import { PAYMENT_METHODS } from '../services/parser.js';
 import { targetSpace } from '../lib/scope.js';
-import { bumpAccount } from '../lib/accounts.js';
 
 const router = Router();
 
@@ -45,17 +44,9 @@ const TYPES = ['expense', 'income', 'transfer'];
 // A "saving" is a transfer tagged with a goal — that's what feeds goal progress.
 const feedsGoal = (t) => t.type === 'transfer' && t.goal_id;
 
-// Apply (sign +1) or reverse (sign -1) a transaction's effect on account balances.
-// expense lowers its account, income raises it, transfer moves between accounts.
-async function applyBalanceEffect(t, sign, userId) {
-  const amt = Number(t.amount) * sign;
-  if (t.type === 'expense' && t.card_id) await bumpAccount(t.card_id, -amt, userId);
-  else if (t.type === 'income' && t.card_id) await bumpAccount(t.card_id, amt, userId);
-  else if (t.type === 'transfer') {
-    if (t.card_id) await bumpAccount(t.card_id, -amt, userId);
-    if (t.to_card_id) await bumpAccount(t.to_card_id, amt, userId);
-  }
-}
+// Account balances are DERIVED from transactions (see lib/accounts.js), so
+// creating/editing/deleting a transaction needs no balance bookkeeping here —
+// the balance is recomputed from the records on read and can never drift.
 
 // Validate a goal_id belongs to one of the user's spaces; returns its id or null.
 async function resolveGoalId(req, goalId) {
@@ -164,7 +155,6 @@ router.post('/', async (req, res, next) => {
       if (transaction_date) trow.transaction_date = new Date(transaction_date).toISOString();
       const { data, error } = await supabase.from('transactions').insert(trow).select().single();
       if (error) throw new Error(error.message);
-      await applyBalanceEffect(data, +1, req.user.id);
       if (goalId) await bumpGoal(goalId, value, req.spaceIds);
       return res.status(201).json(data);
     }
@@ -198,9 +188,6 @@ router.post('/', async (req, res, next) => {
 
     const { data, error } = await supabase.from('transactions').insert(row).select().single();
     if (error) throw new Error(error.message);
-
-    // Expense/income adjust the linked account's balance.
-    await applyBalanceEffect(data, +1, req.user.id);
 
     res.status(201).json(data);
   } catch (err) {
@@ -298,10 +285,7 @@ router.put('/:id', async (req, res, next) => {
     // (goal-tagged transfers feed a goal).
     if (feedsGoal(old)) await bumpGoal(old.goal_id, -Number(old.amount), req.spaceIds);
     if (feedsGoal(data)) await bumpGoal(data.goal_id, Number(data.amount), req.spaceIds);
-
-    // Re-sync account balances: reverse the old effect, apply the new one.
-    await applyBalanceEffect(old, -1, req.user.id);
-    await applyBalanceEffect(data, +1, req.user.id);
+    // Account balances are derived from the records — nothing to re-sync here.
 
     res.json(data);
   } catch (err) {
@@ -324,8 +308,7 @@ router.delete('/:id', async (req, res, next) => {
 
     // Deleting a goal-feeding entry removes its contribution from the goal.
     if (feedsGoal(data)) await bumpGoal(data.goal_id, -Number(data.amount), req.spaceIds);
-    // Reverse its effect on account balances.
-    await applyBalanceEffect(data, -1, req.user.id);
+    // Account balances are derived from the records — nothing to reverse here.
 
     res.json({ deleted: data.id });
   } catch (err) {

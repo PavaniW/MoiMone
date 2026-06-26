@@ -1,31 +1,59 @@
 import { supabase } from './supabase.js';
 
-// Adjust an account's balance by delta (expense −, income +, transfer moves it).
-export async function bumpAccount(cardId, delta, userId) {
-  if (!cardId || !delta) return;
-  const { data } = await supabase
-    .from('cards')
-    .select('balance')
-    .eq('id', cardId)
-    .eq('user_id', userId)
-    .maybeSingle();
-  if (!data) return;
-  await supabase
-    .from('cards')
-    .update({ balance: Math.round((Number(data.balance) + delta) * 100) / 100 })
-    .eq('id', cardId)
-    .eq('user_id', userId);
+// Balances are DERIVED, never mutated in place: a card's current balance is its
+// opening_balance plus the sum of its transactions' effects. This makes a missed
+// or failed update structurally impossible — the balance is always exactly the
+// sum of the records.
+
+// Effect of the transactions on each of the given card ids:
+//   expense → −amount (from card_id)
+//   income  → +amount (to card_id)
+//   transfer→ −amount from card_id, +amount to to_card_id
+async function effectsByCard(cardIds) {
+  const map = Object.fromEntries(cardIds.map((id) => [id, 0]));
+  if (!cardIds.length) return map;
+  const list = cardIds.join(',');
+  const { data, error } = await supabase
+    .from('transactions')
+    .select('amount, type, card_id, to_card_id')
+    .or(`card_id.in.(${list}),to_card_id.in.(${list})`);
+  if (error) throw new Error(error.message);
+  for (const t of data || []) {
+    const amt = Number(t.amount) || 0;
+    if (t.card_id && map[t.card_id] !== undefined) {
+      map[t.card_id] += t.type === 'income' ? amt : -amt; // income +, expense/transfer-from −
+    }
+    if (t.to_card_id && map[t.to_card_id] !== undefined) {
+      map[t.to_card_id] += amt; // transfer destination +
+    }
+  }
+  return map;
 }
 
-// Set an account's balance absolutely (from an SMS "available balance", or a
-// manual set in the app). Balances can be negative (e.g. credit card debt).
-export async function setAccountBalance(cardId, balance, userId) {
-  if (!cardId) return;
-  await supabase
+// The user's cards, each with its derived current `balance`.
+export async function cardsWithBalances(userId) {
+  const { data: cards, error } = await supabase
     .from('cards')
-    .update({ balance: Math.round(Number(balance) * 100) / 100 })
-    .eq('id', cardId)
-    .eq('user_id', userId);
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: true });
+  if (error) throw new Error(error.message);
+  const list = cards || [];
+  const fx = await effectsByCard(list.map((c) => c.id));
+  return list.map((c) => ({
+    ...c,
+    balance: Math.round((Number(c.opening_balance || 0) + (fx[c.id] || 0)) * 100) / 100,
+  }));
+}
+
+// Set a card's CURRENT balance to an exact figure — used by a manual edit in the
+// app and by an SMS "available balance" (both mean "the true balance is X"). We
+// store the opening so that opening + effects == X.
+export async function setCardBalance(cardId, target, userId) {
+  if (!cardId || target == null || target === '') return;
+  const fx = await effectsByCard([cardId]);
+  const opening = Math.round((Number(target) - (fx[cardId] || 0)) * 100) / 100;
+  await supabase.from('cards').update({ opening_balance: opening }).eq('id', cardId).eq('user_id', userId);
 }
 
 // The user's accounts as {id, nickname, bank, type}, for name-matching a parsed
@@ -68,7 +96,7 @@ export async function ensureCashAccount(userId) {
   if (data?.id) return data.id;
   const { data: created, error } = await supabase
     .from('cards')
-    .insert({ user_id: userId, nickname: 'Cash', type: 'cash', balance: 0 })
+    .insert({ user_id: userId, nickname: 'Cash', type: 'cash', opening_balance: 0 })
     .select('id')
     .single();
   if (error) throw new Error(error.message);

@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase.js';
 import { monthRange, currentPeriod } from '../lib/period.js';
 import { DEFAULT_CURRENCY } from '../services/parser.js';
 import { answerFinanceQuestion } from '../services/finance-chat.js';
+import { cardsWithBalances } from '../lib/accounts.js';
 
 const router = Router();
 
@@ -93,14 +94,10 @@ async function buildContext(req, spaceIds) {
 
   const monthLabel = (m, y) => `${String(m).padStart(2, '0')}/${y}`;
 
-  // Live account balances (scoped to the user). "Available now" = spendable
-  // accounts (debit + cash), matching the dashboard's Available figure exactly.
-  const { data: cardRows, error: cErr } = await supabase
-    .from('cards')
-    .select('nickname, type, balance')
-    .eq('user_id', req.user.id);
-  if (cErr) throw new Error(cErr.message);
-  const accounts = (cardRows || []).map((c) => ({ name: c.nickname, type: c.type, balance: round(c.balance) }));
+  // Live account balances (derived from transactions, scoped to the user).
+  // "Available now" = spendable accounts (debit + cash), matching the dashboard.
+  const cardRows = await cardsWithBalances(req.user.id);
+  const accounts = cardRows.map((c) => ({ name: c.nickname, type: c.type, balance: round(c.balance) }));
   const availableNow = round(
     accounts.filter((a) => a.type === 'debit' || a.type === 'cash').reduce((s, a) => s + a.balance, 0)
   );

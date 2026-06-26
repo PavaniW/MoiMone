@@ -5,7 +5,7 @@ import { userCategoryNames } from '../lib/categories.js';
 import { categoryForMerchant } from '../lib/merchant-rules.js';
 import { toLKR } from '../lib/fx.js';
 import { goalsForSpace, matchGoal, addToGoal } from '../lib/goals.js';
-import { setAccountBalance, bumpAccount, userAccounts, matchAccountByName, ensureCashAccount } from '../lib/accounts.js';
+import { setCardBalance, userAccounts, matchAccountByName, ensureCashAccount } from '../lib/accounts.js';
 import { supabase } from '../lib/supabase.js';
 import { monthRange, currentPeriod } from '../lib/period.js';
 import { userByWhatsApp, matchUserCard } from '../lib/ingest.js';
@@ -165,8 +165,7 @@ router.post('/whatsapp', authenticate, async (req, res) => {
         goal_id: goal?.id ?? null,
       });
       if (error) throw new Error(error.message);
-      if (fromAcct) await bumpAccount(fromAcct.id, -amount, who.userId);
-      if (toAcct) await bumpAccount(toAcct.id, amount, who.userId);
+      // Account balances are derived from the records; only goal progress is tracked.
       if (goal) await addToGoal(goal.id, amount, who.spaceId);
 
       if (goal) {
@@ -207,15 +206,10 @@ router.post('/whatsapp', authenticate, async (req, res) => {
     });
     if (error) throw new Error(error.message);
 
-    // Keep the linked account's balance fresh (same rule as the SMS webhook).
-    if (card) {
-      if (parsed.account_balance != null) {
-        await setAccountBalance(card.id, parsed.account_balance, who.userId);
-      } else if (parsed.type === 'income') {
-        await bumpAccount(card.id, amount, who.userId);
-      } else if (parsed.type === 'expense') {
-        await bumpAccount(card.id, -amount, who.userId);
-      }
+    // Balance is derived from the records; only an SMS-stated balance needs
+    // action — reconcile the account to the bank's figure.
+    if (card && parsed.account_balance != null) {
+      await setCardBalance(card.id, parsed.account_balance, who.userId);
     }
 
     const merchant =
