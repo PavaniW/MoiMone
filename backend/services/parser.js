@@ -131,6 +131,18 @@ function reconcileAmount(rawText, modelAmount) {
   return cands[0];
 }
 
+// An "available balance" is authoritative (it OVERWRITES the account balance),
+// so we must not act on a hallucinated one. Only honor it when the message
+// actually mentions a balance; otherwise drop it (the txn just adjusts the
+// balance incrementally instead). Prevents a phantom balance from masking a
+// real deduction.
+function reconcileBalance(rawText, modelBalance) {
+  if (modelBalance == null) return null;
+  if (/\b(avl|avail(?:able)?|bal(?:ance)?)\b/i.test(String(rawText || ''))) return modelBalance;
+  console.warn(`parser: dropping account_balance ${modelBalance} — no balance phrase in the message`);
+  return null;
+}
+
 // Validate a model-supplied date → ISO string, or null if absent/implausible.
 function cleanDate(value) {
   const s = String(value ?? '').trim();
@@ -297,5 +309,7 @@ export async function parseTransaction(rawText, { categories, goals, accounts } 
   // The amount must be exact — verify it against the raw text, don't just trust
   // the LLM's reading of the number.
   result.amount = reconcileAmount(rawText, result.amount);
+  // A stated balance overwrites the account balance, so drop hallucinated ones.
+  result.account_balance = reconcileBalance(rawText, result.account_balance);
   return result;
 }
