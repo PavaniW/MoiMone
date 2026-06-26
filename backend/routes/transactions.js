@@ -272,9 +272,15 @@ router.put('/:id', async (req, res, next) => {
     }
     if (req.body?.space_id !== undefined) updates.space_id = targetSpace(req, req.body.space_id);
 
-    // Only transfers may hold a goal; income/expense never do.
+    // Keep fields consistent with the final type. A transfer is account→account,
+    // so it carries no payment_method/card_last4; income/expense never hold a goal.
     const finalType = updates.type ?? old.type;
-    if (finalType !== 'transfer') updates.goal_id = null;
+    if (finalType === 'transfer') {
+      updates.payment_method = null;
+      updates.card_last4 = null;
+    } else {
+      updates.goal_id = null;
+    }
 
     if (!Object.keys(updates).length) throw badRequest('no fields to update');
 
