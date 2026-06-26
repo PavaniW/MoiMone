@@ -101,6 +101,36 @@ Rules:
 
 Return only the structured object — no commentary.`;
 
+// Pull every currency-tagged amount out of the raw text, e.g. "LKR 3,388.01",
+// "Rs. 1,650", "USD 50.00", "$12.30". Banks always write the figure this way,
+// so these are far more reliable than the LLM's reading of the number.
+function amountCandidates(text) {
+  const re = /(?:LKR|Rs\.?|USD|EUR|GBP|SAR|AED|INR|\$|€|£|₹)\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)/gi;
+  const out = [];
+  let m;
+  while ((m = re.exec(String(text || '')))) {
+    const n = Number(m[1].replace(/,/g, ''));
+    if (Number.isFinite(n) && n > 0) out.push(n);
+  }
+  return out;
+}
+
+// The amount is the one number that must be exact. Trust the LLM's *choice*
+// (it correctly tells the purchase amount apart from an available balance) only
+// when that value actually appears in the message; if the model's number isn't
+// in the text it misread it, so fall back to the first currency amount (the
+// purchase figure precedes any balance in bank SMS). With no currency figure at
+// all (e.g. a typed "spent 500"), keep the model's number.
+function reconcileAmount(rawText, modelAmount) {
+  const cands = amountCandidates(rawText);
+  if (!cands.length) return modelAmount;
+  if (cands.some((c) => Math.abs(c - modelAmount) < 0.005)) return modelAmount;
+  console.warn(
+    `parser: amount mismatch — model said ${modelAmount}, text shows ${cands.join(', ')}; using ${cands[0]}`
+  );
+  return cands[0];
+}
+
 // Validate a model-supplied date → ISO string, or null if absent/implausible.
 function cleanDate(value) {
   const s = String(value ?? '').trim();
@@ -263,5 +293,9 @@ export async function parseTransaction(rawText, { categories, goals, accounts } 
   else if (provider === 'groq') raw = await parseWithGroq(rawText, allowed, today, goalNames, accountNames);
   else if (provider === 'claude') raw = await parseWithClaude(rawText, allowed, today, goalNames, accountNames);
   else throw new Error(`Unknown PARSER_PROVIDER "${provider}" (use "ollama", "groq", or "claude")`);
-  return normalize(raw, allowed);
+  const result = normalize(raw, allowed);
+  // The amount must be exact — verify it against the raw text, don't just trust
+  // the LLM's reading of the number.
+  result.amount = reconcileAmount(rawText, result.amount);
+  return result;
 }
