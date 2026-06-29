@@ -48,6 +48,7 @@ router.post('/', async (req, res, next) => {
         color: color ? String(color).trim() : null,
         // The entered figure is the opening balance; current balance is derived.
         opening_balance: balance !== undefined && balance !== '' ? Number(balance) : 0,
+        opening_set_at: new Date().toISOString(),
       })
       .select()
       .single();

@@ -53,7 +53,11 @@ export async function setCardBalance(cardId, target, userId) {
   if (!cardId || target == null || target === '') return;
   const fx = await effectsByCard([cardId]);
   const opening = Math.round((Number(target) - (fx[cardId] || 0)) * 100) / 100;
-  await supabase.from('cards').update({ opening_balance: opening }).eq('id', cardId).eq('user_id', userId);
+  await supabase
+    .from('cards')
+    .update({ opening_balance: opening, opening_set_at: new Date().toISOString() })
+    .eq('id', cardId)
+    .eq('user_id', userId);
 }
 
 // The user's accounts as {id, nickname, bank, type}, for name-matching a parsed
@@ -96,7 +100,7 @@ export async function ensureCashAccount(userId) {
   if (data?.id) return data.id;
   const { data: created, error } = await supabase
     .from('cards')
-    .insert({ user_id: userId, nickname: 'Cash', type: 'cash', opening_balance: 0 })
+    .insert({ user_id: userId, nickname: 'Cash', type: 'cash', opening_balance: 0, opening_set_at: new Date().toISOString() })
     .select('id')
     .single();
   if (error) throw new Error(error.message);

@@ -5,6 +5,17 @@ import Loading, { Spinner } from '../components/Loading.jsx';
 import BackLink from '../components/BackLink.jsx';
 
 const SWATCHES = ['#2f6b4f', '#b0563c', '#45B7D1', '#DDA0DD', '#FFC857', '#4ECDC4'];
+
+// When the balance was last set/reconciled, as a short label.
+function balanceSetLabel(iso) {
+  if (!iso) return null;
+  const then = new Date(iso);
+  const days = Math.floor((Date.now() - then.getTime()) / 86400000);
+  if (days <= 0) return 'balance set today';
+  if (days === 1) return 'balance set yesterday';
+  if (days < 7) return `balance set ${days}d ago`;
+  return `balance set ${then.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}`;
+}
 const EMPTY = { nickname: '', bank: '', type: 'credit', last4: '', color: SWATCHES[0], balance: '' };
 
 // Accounts manager — cards, bank accounts and cash are all "accounts" (one
@@ -240,13 +251,18 @@ export default function Cards() {
                   </button>
                 </div>
               ) : (
-                <button
-                  className={`card-bal num ${Number(c.balance) < 0 ? 'neg' : ''}`}
-                  title="Tap to set balance"
-                  onClick={() => startBal(c)}
-                >
-                  {CURRENCY} {formatAmount(Number(c.balance || 0))}
-                </button>
+                <>
+                  <button
+                    className={`card-bal num ${Number(c.balance) < 0 ? 'neg' : ''}`}
+                    title="Tap to set balance"
+                    onClick={() => startBal(c)}
+                  >
+                    {CURRENCY} {formatAmount(Number(c.balance || 0))}
+                  </button>
+                  {balanceSetLabel(c.opening_set_at) && (
+                    <span className="card-bal-when">{balanceSetLabel(c.opening_set_at)}</span>
+                  )}
+                </>
               )}
             </div>
           ))}

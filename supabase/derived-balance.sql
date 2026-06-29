@@ -12,3 +12,5 @@
 -- backfill sets opening_balance for existing cards so displayed balances don't
 -- change (opening_balance = old balance − sum of effects).
 ALTER TABLE cards ADD COLUMN IF NOT EXISTS opening_balance NUMERIC NOT NULL DEFAULT 0;
+-- When the balance was last set/reconciled (shown as "balance set <when>").
+ALTER TABLE cards ADD COLUMN IF NOT EXISTS opening_set_at TIMESTAMPTZ;

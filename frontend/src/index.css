@@ -2062,6 +2062,12 @@ body {
   cursor: pointer;
   text-align: left;
 }
+.card-bal-when {
+  display: block;
+  margin-top: 0.3rem;
+  font-size: 0.7rem;
+  color: var(--faint);
+}
 .card-bal:hover {
   border-bottom-color: var(--green);
 }
