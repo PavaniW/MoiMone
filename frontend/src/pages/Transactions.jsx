@@ -51,8 +51,10 @@ export default function Transactions() {
     setNeedsReview(false);
   }
 
-  // Auto-imported (not manual) entries the parser couldn't categorize → "Other".
-  const isReview = (t) => t.source !== 'manual' && t.category === 'Other';
+  // Auto-imported (not manual) expense/income the parser couldn't categorize →
+  // "Other". Transfers carry the fixed "Transfer" label, not a real category, so
+  // they never need review.
+  const isReview = (t) => t.source !== 'manual' && t.type !== 'transfer' && t.category === 'Other';
 
   useEffect(() => {
     if (!currentSpaceId) return; // wait for the active space
