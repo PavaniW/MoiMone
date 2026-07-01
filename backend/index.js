@@ -13,6 +13,7 @@ import goalsRouter from './routes/goals.js';
 import categoriesRouter from './routes/categories.js';
 import merchantRulesRouter from './routes/merchant-rules.js';
 import chatRouter from './routes/chat.js';
+import dashboardRouter from './routes/dashboard.js';
 import gmailRouter from './routes/gmail.js';
 import webhookRouter from './routes/webhook.js';
 import whatsappRouter from './routes/whatsapp.js';
@@ -46,6 +47,7 @@ app.use('/api/goals', goalsRouter);
 app.use('/api/categories', categoriesRouter);
 app.use('/api/merchant-rules', merchantRulesRouter);
 app.use('/api/chat', chatRouter);
+app.use('/api/dashboard', dashboardRouter);
 app.use('/api/gmail', gmailRouter);
 
 // --- Inbound webhooks ---

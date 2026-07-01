@@ -130,21 +130,15 @@ export default function Dashboard() {
     loadedSpace.current = currentSpaceId;
     (async () => {
       try {
-        const sp = `&space=${currentSpaceId}`;
         const start = addMonths(period.month, period.year, -5);
         const end = addMonths(period.month, period.year, 1); // exclusive
         const from = `${monthKey(start.month, start.year)}-01`;
         const to = `${monthKey(end.month, end.year)}-01`;
-        const budgetParams = `?month=${period.month}&year=${period.year}${sp}`;
-        const [categories, cards, windowTxns, recentTxns, budgetRows] = await Promise.all([
-          api.getCategories(),
-          api.getCards(),
-          api.getTransactions(`?from=${from}&to=${to}${sp}`),
-          api.getTransactions(`?limit=5${sp}`),
-          api.getBudgets(budgetParams),
-        ]);
+        // One request instead of five — same data, fed into the same build().
+        const params = `?space=${currentSpaceId}&from=${from}&to=${to}&month=${period.month}&year=${period.year}`;
+        const d = await api.getDashboard(params);
         if (active)
-          setState({ status: 'ready', data: build(categories, cards, windowTxns, recentTxns, budgetRows, period) });
+          setState({ status: 'ready', data: build(d.categories, d.cards, d.transactions, d.recent, d.budgets, period) });
       } catch (err) {
         if (active) setState({ status: 'error', message: err.message });
       }

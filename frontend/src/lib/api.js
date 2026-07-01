@@ -50,6 +50,9 @@ export const api = {
     request(`/api/spaces/${spaceId}/members/${userId}`, { method: 'DELETE' }),
   deleteSpace: (spaceId) => request(`/api/spaces/${spaceId}`, { method: 'DELETE' }),
 
+  // Dashboard — one request that bundles categories, cards, transactions, budgets.
+  getDashboard: (params = '') => request(`/api/dashboard${params}`),
+
   // Transactions
   getTransactions: (params = '') => request(`/api/transactions${params}`),
   createTransaction: (data) =>
