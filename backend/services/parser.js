@@ -215,7 +215,7 @@ async function parseWithClaude(rawText, categories, today, goals, accounts) {
 async function parseWithGroq(rawText, categories, today, goals, accounts) {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) throw new Error('GROQ_API_KEY is not set');
-  const model = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+  const model = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
 
   const jsonInstruction = `Return a JSON object with exactly these keys: amount (number), currency (string), merchant (string), type ("expense", "income" or "transfer"), category (one of: ${categories.join(', ')}), payment_method (one of: credit, debit, cash, other), card_last4 (string: the card's last 4 digits, or "" if not stated), date (string: the transaction date as ISO YYYY-MM-DD if the message states one, else ""), goal (string: for a transfer, the matching goal name, else ""), from_account (string: for a transfer, the source account name, else ""), to_account (string: for a transfer, the destination account name, else ""), account_balance (string: the available balance if stated, digits only, else ""), confidence (number 0-1).`;
 
