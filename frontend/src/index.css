@@ -475,6 +475,10 @@ body {
   gap: 1.5rem;
   margin-top: 1.75rem;
 }
+/* Range mode hides the Budgets panel, so the chart spans the full width. */
+.dash-grid.solo {
+  grid-template-columns: 1fr;
+}
 
 .panel {
   background: var(--panel);
@@ -1774,6 +1778,94 @@ body {
   text-align: center;
 }
 
+/* ---------- Dashboard: month / range controls ---------- */
+.dash-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.55rem;
+}
+.mode-toggle {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--panel);
+}
+.mode-toggle button {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 0.32rem 0.7rem;
+  cursor: pointer;
+}
+.mode-toggle button + button {
+  border-left: 1px solid var(--line);
+}
+.mode-toggle button.active {
+  background: var(--green);
+  color: #fff;
+}
+.range-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.45rem;
+}
+.range-presets {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.35rem;
+}
+.range-preset {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+.range-preset:hover {
+  border-color: var(--green);
+  color: var(--green);
+}
+.range-preset.active {
+  background: var(--green);
+  border-color: var(--green);
+  color: #fff;
+}
+.range-inputs {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.range-inputs input[type='date'] {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--ink);
+  border-radius: 8px;
+  padding: 0.28rem 0.45rem;
+  font-size: 0.78rem;
+  font-family: var(--mono);
+}
+.range-inputs input[type='date']:focus {
+  outline: none;
+  border-color: var(--green);
+}
+.range-sep {
+  color: var(--muted);
+}
+.range-warn {
+  font-size: 0.72rem;
+  color: var(--neg, #b0563c);
+}
+
 /* ---------- Dashboard: 6-month trend ---------- */
 .trend {
   display: flex;
@@ -1999,12 +2091,28 @@ body {
 }
 
 @media (max-width: 640px) {
-  /* Let the month nav drop below the title instead of squeezing it onto 2 lines */
+  /* Let the month nav / range controls drop below the title instead of squeezing */
   .stmt-head {
     flex-wrap: wrap;
     gap: 0.5rem 0.75rem;
   }
   .field-input[type='date'] {
+    font-size: 1rem;
+  }
+  /* Give the range controls the full row and left-align on small screens */
+  .dash-controls {
+    align-items: flex-start;
+    width: 100%;
+  }
+  .range-controls,
+  .range-presets {
+    align-items: flex-start;
+    justify-content: flex-start;
+  }
+  .range-inputs {
+    flex-wrap: wrap;
+  }
+  .range-inputs input[type='date'] {
     font-size: 1rem;
   }
 }
