@@ -130,10 +130,28 @@ export default function WhatsAppSetup() {
             <span className="wa-cmd-desc">Foreign currency is auto-converted to LKR.</span>
           </li>
           <li>
-            <span className="wa-cmd-eg">“summary”</span>
+            <span className="wa-cmd-eg">“week”</span>
             <span className="wa-cmd-desc">
-              Text this word and the bot replies with your spending for the last 7 days + top
-              category. The words “week” and “report” do the same thing.
+              Weekly report — last 7 days: total spent, income, saved, and a full by-category
+              breakdown. (“summary”, “weekly” and “report” do the same.)
+            </span>
+          </li>
+          <li>
+            <span className="wa-cmd-eg">“month”</span>
+            <span className="wa-cmd-desc">
+              Monthly report — this calendar month, with the by-category breakdown. (“monthly” too.)
+            </span>
+          </li>
+          <li>
+            <span className="wa-cmd-eg">“balances”</span>
+            <span className="wa-cmd-desc">
+              Your account balances plus available cash (debit + cash). (“balance” or “accounts” too.)
+            </span>
+          </li>
+          <li>
+            <span className="wa-cmd-desc">
+              📅 You’ll also get the weekly report pushed to WhatsApp automatically every Sunday
+              evening.
             </span>
           </li>
         </ul>

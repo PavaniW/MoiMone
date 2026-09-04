@@ -11,6 +11,10 @@
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/index" },
     { "source": "/webhook/(.*)", "destination": "/api/index" },
+    { "source": "/cron/(.*)", "destination": "/api/index" },
     { "source": "/((?!assets/).*)", "destination": "/index.html" }
+  ],
+  "crons": [
+    { "path": "/cron/weekly-summary", "schedule": "30 13 * * 0" }
   ]
 }

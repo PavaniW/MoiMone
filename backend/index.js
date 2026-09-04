@@ -17,6 +17,7 @@ import dashboardRouter from './routes/dashboard.js';
 import gmailRouter from './routes/gmail.js';
 import webhookRouter from './routes/webhook.js';
 import whatsappRouter from './routes/whatsapp.js';
+import cronRouter from './routes/cron.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -55,6 +56,10 @@ app.use('/api/gmail', gmailRouter);
 // whatsappRouter → POST /webhook/whatsapp (Twilio)
 app.use('/webhook', webhookRouter);
 app.use('/webhook', whatsappRouter);
+
+// --- Scheduled jobs (Vercel Cron) — gated by CRON_SECRET, not user auth ---
+// cronRouter → GET /cron/weekly-summary
+app.use('/cron', cronRouter);
 
 // --- 404 fallback ---
 app.use((_req, res) => {

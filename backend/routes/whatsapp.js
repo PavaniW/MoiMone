@@ -9,6 +9,7 @@ import { setCardBalance, userAccounts, matchAccountByName, ensureCashAccount } f
 import { supabase } from '../lib/supabase.js';
 import { monthRange, currentPeriod } from '../lib/period.js';
 import { userByWhatsApp, matchUserCard } from '../lib/ingest.js';
+import { spendingReport, balancesReport } from '../lib/summaries.js';
 
 const router = Router();
 const { MessagingResponse } = twilio.twiml;
@@ -76,35 +77,6 @@ async function budgetRemainingLine(category, spaceId) {
   return ` Budget remaining: ${DEFAULT_CURRENCY} ${(limit - spent).toFixed(2)}.`;
 }
 
-// On-demand weekly summary: total spent in the last 7 days + top category.
-async function weeklySummaryLine(spaceId) {
-  const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-  const { data } = await supabase
-    .from('transactions')
-    .select('amount, type, category, goal_id')
-    .eq('space_id', spaceId)
-    .gte('transaction_date', since);
-
-  let spent = 0;
-  let saved = 0;
-  const byCat = {};
-  for (const t of data || []) {
-    const a = Number(t.amount);
-    if (t.type === 'transfer') {
-      if (t.goal_id) saved += a; // goal-tagged transfer = a saving
-      continue; // plain transfers just move money between accounts
-    }
-    if (t.type !== 'expense') continue; // skip income
-    spent += a;
-    byCat[t.category] = (byCat[t.category] || 0) + a;
-  }
-  if (!spent && !saved) return '📊 This week: nothing logged yet.';
-  const top = Object.entries(byCat).sort((a, b) => b[1] - a[1])[0];
-  const topPart = top ? `, top: ${top[0]} (${DEFAULT_CURRENCY} ${top[1].toFixed(2)})` : '';
-  const savedPart = saved ? ` Saved ${DEFAULT_CURRENCY} ${saved.toFixed(2)}.` : '';
-  return `📊 This week you've spent ${DEFAULT_CURRENCY} ${spent.toFixed(2)}${topPart}.${savedPart}`;
-}
-
 // POST /webhook/whatsapp — Twilio posts inbound WhatsApp messages here
 // (application/x-www-form-urlencoded; key fields: Body, From).
 // Flow: parse the natural-language message with Claude → log the transaction →
@@ -125,9 +97,16 @@ router.post('/whatsapp', authenticate, async (req, res) => {
       );
     }
 
-    // On-demand command: weekly summary.
-    if (['summary', 'week', 'report'].includes(body.toLowerCase())) {
-      return reply(res, await weeklySummaryLine(who.spaceId));
+    // On-demand report commands.
+    const cmd = body.toLowerCase();
+    if (['summary', 'week', 'weekly', 'report'].includes(cmd)) {
+      return reply(res, await spendingReport(who.spaceId, 'week'));
+    }
+    if (['month', 'monthly'].includes(cmd)) {
+      return reply(res, await spendingReport(who.spaceId, 'month'));
+    }
+    if (['balance', 'balances', 'accounts'].includes(cmd)) {
+      return reply(res, await balancesReport(who.userId));
     }
 
     const categories = await userCategoryNames(who.userId);
