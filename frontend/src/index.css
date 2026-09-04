@@ -967,6 +967,15 @@ body {
   outline: none;
 }
 
+/* Static category label for transfers/savings (no editable category). */
+.cat-static {
+  font-family: var(--display);
+  font-size: 0.8rem;
+  color: var(--muted);
+  font-style: italic;
+  padding: 0.2rem 0.3rem;
+}
+
 /* ---------- Modal ---------- */
 .modal-overlay {
   position: fixed;

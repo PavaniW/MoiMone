@@ -336,17 +336,24 @@ export default function Transactions() {
                     </span>
                   </span>
                   <span className="hide-sm">
-                    <select
-                      className="cat-select"
-                      value={t.category}
-                      onChange={(e) => handleCategoryChange(t.id, e.target.value)}
-                    >
-                      {categories.map((c) => (
-                        <option key={c.name} value={c.name}>
-                          {c.name}
-                        </option>
-                      ))}
-                    </select>
+                    {isTransfer || isSaving ? (
+                      // Transfers/savings have no user category (their category is the
+                      // fixed "Transfer" label), so show it static — an editable select
+                      // would default to the first real category and could overwrite it.
+                      <span className="cat-static">{isSaving ? 'Saving' : 'Transfer'}</span>
+                    ) : (
+                      <select
+                        className="cat-select"
+                        value={t.category}
+                        onChange={(e) => handleCategoryChange(t.id, e.target.value)}
+                      >
+                        {categories.map((c) => (
+                          <option key={c.name} value={c.name}>
+                            {c.name}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                   </span>
                   <span className="src-tag hide-sm">{t.source}</span>
                   <span
