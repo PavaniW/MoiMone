@@ -31,6 +31,13 @@ async function resolveCard(req, cardId) {
   return data;
 }
 
+// payment_method for a transaction on this account. A 'bank' account (e.g. a
+// money market account) isn't a payment method the DB check allows, so it
+// carries none — the card_id link is what ties it to the account.
+function methodForCard(card) {
+  return PAYMENT_METHODS.includes(card.type) ? card.type : null;
+}
+
 // Reject a request with a 400 the error handler will surface to the client.
 function badRequest(message) {
   const err = new Error(message);
@@ -176,7 +183,7 @@ router.post('/', async (req, res, next) => {
       category: cat,
       merchant: merchant ? String(merchant).trim() : null,
       description: description ? String(description).trim() : null,
-      payment_method: card ? card.type : payment_method || null,
+      payment_method: card ? methodForCard(card) : payment_method || null,
       card_last4: card ? card.last4 : cleanLast4(card_last4),
       card_id: card ? card.id : null,
       goal_id: null, // only transfers feed goals
@@ -245,7 +252,7 @@ router.put('/:id', async (req, res, next) => {
       if (card_id) {
         const card = await resolveCard(req, card_id);
         updates.card_id = card.id;
-        updates.payment_method = card.type;
+        updates.payment_method = methodForCard(card);
         updates.card_last4 = card.last4;
       } else {
         updates.card_id = null;
