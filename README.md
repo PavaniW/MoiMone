@@ -17,7 +17,14 @@ shortcuts/  iOS Shortcut setup for bank SMS forwarding
 ## Getting started
 
 ### 1. Database
-Open the Supabase SQL editor and run `supabase/schema.sql`.
+Open the Supabase SQL editor and run `supabase/schema.sql`, then the other
+migration files (`multi-user.sql`, `cards.sql`, `merchant-rules.sql`, …) and
+finally **`policies.sql`**.
+
+> **Security:** `policies.sql` turns on Row-Level Security. The backend uses the
+> service-role key (which bypasses RLS), but enabling RLS with no public policies
+> ensures the browser's anon key can't read or write any table directly. Don't
+> skip it.
 
 ### 2. Backend
 ```bash

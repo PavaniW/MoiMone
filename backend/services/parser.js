@@ -121,7 +121,7 @@ function amountCandidates(text) {
 // in the text it misread it, so fall back to the first currency amount (the
 // purchase figure precedes any balance in bank SMS). With no currency figure at
 // all (e.g. a typed "spent 500"), keep the model's number.
-function reconcileAmount(rawText, modelAmount) {
+export function reconcileAmount(rawText, modelAmount) {
   const cands = amountCandidates(rawText);
   if (!cands.length) return modelAmount;
   if (cands.some((c) => Math.abs(c - modelAmount) < 0.005)) return modelAmount;
@@ -136,7 +136,7 @@ function reconcileAmount(rawText, modelAmount) {
 // actually mentions a balance; otherwise drop it (the txn just adjusts the
 // balance incrementally instead). Prevents a phantom balance from masking a
 // real deduction.
-function reconcileBalance(rawText, modelBalance) {
+export function reconcileBalance(rawText, modelBalance) {
   if (modelBalance == null) return null;
   if (/\b(avl|avail(?:able)?|bal(?:ance)?)\b/i.test(String(rawText || ''))) return modelBalance;
   console.warn(`parser: dropping account_balance ${modelBalance} — no balance phrase in the message`);
@@ -144,7 +144,7 @@ function reconcileBalance(rawText, modelBalance) {
 }
 
 // Validate a model-supplied date → ISO string, or null if absent/implausible.
-function cleanDate(value) {
+export function cleanDate(value) {
   const s = String(value ?? '').trim();
   if (!s) return null;
   const d = new Date(s);
@@ -156,7 +156,7 @@ function cleanDate(value) {
 
 // Guarantee a valid, consistent shape regardless of which model produced it.
 // `categories` is the list considered valid; anything else falls back to "Other".
-function normalize(p, categories) {
+export function normalize(p, categories) {
   const amount = Math.abs(Number(p?.amount)) || 0;
   const type = p?.type === 'income' ? 'income' : p?.type === 'transfer' ? 'transfer' : 'expense';
   const category = categories.includes(p?.category) ? p.category : 'Other';
@@ -197,14 +197,17 @@ function preamble(today, goals, accounts) {
 let anthropic;
 async function parseWithClaude(rawText, categories, today, goals, accounts) {
   if (!anthropic) anthropic = new Anthropic();
-  const response = await anthropic.messages.create({
-    model: CLAUDE_MODEL,
-    max_tokens: 1024,
-    thinking: { type: 'disabled' },
-    system: SYSTEM_PROMPT,
-    messages: [{ role: 'user', content: `${preamble(today, goals, accounts)}\n\n${rawText}` }],
-    output_config: { format: { type: 'json_schema', schema: buildTransactionSchema(categories) } },
-  });
+  const response = await anthropic.messages.create(
+    {
+      model: CLAUDE_MODEL,
+      max_tokens: 1024,
+      thinking: { type: 'disabled' },
+      system: SYSTEM_PROMPT,
+      messages: [{ role: 'user', content: `${preamble(today, goals, accounts)}\n\n${rawText}` }],
+      output_config: { format: { type: 'json_schema', schema: buildTransactionSchema(categories) } },
+    },
+    { timeout: 20000 }
+  );
   if (response.stop_reason === 'refusal') throw new Error('model refused to parse the message');
   const textBlock = response.content.find((b) => b.type === 'text');
   if (!textBlock) throw new Error('no text block in model response');
@@ -223,6 +226,7 @@ async function parseWithGroq(rawText, categories, today, goals, accounts) {
   try {
     res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
+      signal: AbortSignal.timeout(15000),
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({
         model,
@@ -256,6 +260,7 @@ async function parseWithOllama(rawText, categories, today, goals, accounts) {
   try {
     res = await fetch(`${base}/api/chat`, {
       method: 'POST',
+      signal: AbortSignal.timeout(20000),
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model,

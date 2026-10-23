@@ -14,8 +14,10 @@ const router = Router();
 // messaged the bot within the last 24h — so a push is reliable only alongside
 // the daily keep-alive, or on a production WhatsApp sender.
 router.get('/weekly-summary', async (req, res) => {
+  // Fail CLOSED: if no secret is configured the endpoint must not be callable,
+  // otherwise it would be a public trigger that spams every user and leaks data.
   const secret = process.env.CRON_SECRET;
-  if (secret && (req.headers.authorization || '') !== `Bearer ${secret}`) {
+  if (!secret || (req.headers.authorization || '') !== `Bearer ${secret}`) {
     return res.status(401).json({ error: 'unauthorized' });
   }
 
@@ -33,21 +35,24 @@ router.get('/weekly-summary', async (req, res) => {
     .not('whatsapp_number', 'is', null);
   if (error) return res.status(500).json({ error: error.message });
 
-  const results = [];
+  let sent = 0;
+  let attempted = 0;
   for (const p of profiles || []) {
     if (!p.whatsapp_number || !p.personal_space_id) continue;
+    attempted += 1;
     const to = p.whatsapp_number.startsWith('whatsapp:') ? p.whatsapp_number : `whatsapp:${p.whatsapp_number}`;
     try {
       const bodyText = await spendingReport(p.personal_space_id, 'week');
       await client.messages.create({ from, to, body: bodyText });
-      results.push({ to, ok: true });
+      sent += 1;
     } catch (err) {
-      results.push({ to, ok: false, error: err.message });
+      // Log server-side; never return recipient numbers in the HTTP response.
+      console.error('weekly-summary send failed:', err.message);
     }
   }
 
-  const sent = results.filter((r) => r.ok).length;
-  res.json({ sent, attempted: results.length, results });
+  // Return counts only — no phone numbers or per-recipient detail.
+  res.json({ sent, attempted, failed: attempted - sent });
 });
 
 export default router;
