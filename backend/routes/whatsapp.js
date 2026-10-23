@@ -26,7 +26,11 @@ function reply(res, message) {
 // proxy's forwarding headers so it matches what Twilio signed). Set
 // TWILIO_SKIP_VALIDATION=true to bypass while debugging a local tunnel.
 function authenticate(req, res, next) {
-  if (process.env.TWILIO_SKIP_VALIDATION === 'true') return next();
+  // The skip is a LOCAL debugging aid only — never honor it in production, so a
+  // stray env var can't leave the webhook open.
+  if (process.env.TWILIO_SKIP_VALIDATION === 'true' && process.env.NODE_ENV !== 'production') {
+    return next();
+  }
 
   const twilioToken = process.env.TWILIO_AUTH_TOKEN;
   if (!twilioToken) {
@@ -201,8 +205,9 @@ router.post('/whatsapp', authenticate, async (req, res) => {
       `✅ Logged: ${sign}${DEFAULT_CURRENCY} ${amount}${orig} – ${category}${merchant}.${remaining}`
     );
   } catch (err) {
+    // Log the detail server-side; don't echo internal error text back to the user.
     console.error('whatsapp webhook error:', err.message);
-    reply(res, `⚠️ Sorry, I couldn't log that. (${err.message})`);
+    reply(res, "⚠️ Sorry, I couldn't log that. Please try again in a moment.");
   }
 });
 

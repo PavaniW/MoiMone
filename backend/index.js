@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { pathToFileURL } from 'url';
 import express from 'express';
 import cors from 'cors';
+import rateLimit from 'express-rate-limit';
 
 import { requireAuth } from './middleware/requireAuth.js';
 import meRouter from './routes/me.js';
@@ -21,6 +22,25 @@ import cronRouter from './routes/cron.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Behind Vercel/Netlify's proxy: trust exactly one hop so req.ip is the real
+// client IP (needed for correct, non-spoofable rate limiting).
+app.set('trust proxy', 1);
+
+// Rate limiters. Public webhooks and the LLM-backed chat are the costly/abusable
+// surfaces, so cap requests per IP per minute.
+const webhookLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+const chatLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // --- Middleware ---
 app.use(
@@ -47,13 +67,14 @@ app.use('/api/budgets', budgetsRouter);
 app.use('/api/goals', goalsRouter);
 app.use('/api/categories', categoriesRouter);
 app.use('/api/merchant-rules', merchantRulesRouter);
-app.use('/api/chat', chatRouter);
+app.use('/api/chat', chatLimiter, chatRouter);
 app.use('/api/dashboard', dashboardRouter);
 app.use('/api/gmail', gmailRouter);
 
 // --- Inbound webhooks ---
 // webhookRouter  → POST /webhook/sms      (iOS Shortcut)
 // whatsappRouter → POST /webhook/whatsapp (Twilio)
+app.use('/webhook', webhookLimiter);
 app.use('/webhook', webhookRouter);
 app.use('/webhook', whatsappRouter);
 
@@ -67,9 +88,14 @@ app.use((_req, res) => {
 });
 
 // --- Error handler ---
+// Client errors (status < 500) are deliberate and safe to surface (validation
+// messages, "not a member of that space"). Server errors must NOT leak internals
+// (e.g. raw DB messages) — log them, return a generic message to the client.
 app.use((err, _req, res, _next) => {
   console.error(err);
-  res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
+  const status = err.status || 500;
+  const message = status < 500 ? err.message || 'Request failed' : 'Internal server error';
+  res.status(status).json({ error: message });
 });
 
 // Serverless hosts (Vercel, Netlify) import this module and invoke the exported

@@ -49,13 +49,16 @@ function buildUserMessage(question, context) {
 let anthropic;
 async function chatWithClaude(question, context) {
   if (!anthropic) anthropic = new Anthropic();
-  const response = await anthropic.messages.create({
-    model: CLAUDE_MODEL,
-    max_tokens: 700,
-    thinking: { type: 'disabled' },
-    system: SYSTEM_PROMPT,
-    messages: [{ role: 'user', content: buildUserMessage(question, context) }],
-  });
+  const response = await anthropic.messages.create(
+    {
+      model: CLAUDE_MODEL,
+      max_tokens: 700,
+      thinking: { type: 'disabled' },
+      system: SYSTEM_PROMPT,
+      messages: [{ role: 'user', content: buildUserMessage(question, context) }],
+    },
+    { timeout: 25000 }
+  );
   if (response.stop_reason === 'refusal') throw new Error('the assistant declined to answer that');
   const textBlock = response.content.find((b) => b.type === 'text');
   if (!textBlock) throw new Error('no text block in model response');
@@ -72,6 +75,7 @@ async function chatWithGroq(question, context) {
   try {
     res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
+      signal: AbortSignal.timeout(20000),
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({
         model,
@@ -104,6 +108,7 @@ async function chatWithOllama(question, context) {
   try {
     res = await fetch(`${base}/api/chat`, {
       method: 'POST',
+      signal: AbortSignal.timeout(25000),
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model,

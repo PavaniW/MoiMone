@@ -1,0 +1,17 @@
+{
+  "name": "moimone-finance-mcp",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "MCP server exposing MoiMone finance data (balances, spending, budgets, goals) to any MCP-compatible AI client.",
+  "bin": { "moimone-finance-mcp": "index.js" },
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "@supabase/supabase-js": "^2.45.0",
+    "dotenv": "^16.4.5",
+    "zod": "^3.23.8"
+  }
+}
